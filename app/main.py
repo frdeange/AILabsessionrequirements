@@ -58,14 +58,19 @@ def build_names(base: str) -> Dict[str, str]:
     storage = compose(24, "stg")
     search = compose(60, "src")
     openai = compose(40, "aoa")
-    # Hub no longer required (direct Foundry project). Keep project name only.
-    hub = compose(30, "hub")  # retained in case future change
+    kv = compose(24, "kv")
+    ais = compose(40, "ais")
+    hub = compose(40, "hub")
+    appi = compose(40, "appi")
     project = compose(30, "prj")
     return {
         "storage_account_name": storage,
         "search_service_name": search,
         "openai_account_name": openai,
-        "hub_name": hub,
+        "key_vault_name": kv,
+        "ai_services_name": ais,
+        "ai_foundry_hub_name": hub,
+        "app_insights_name": appi,
         "project_name": project,
         "suffix": suf,
     }
@@ -286,12 +291,23 @@ async def run_full_deployment(deployment_id: str):
             f"openai_account_name = \"{names['openai_account_name']}\"\n"
             f"model_deployment_name = \"{params['model_deployment_name']}\"\n"
             f"foundry_project_name = \"{names['project_name']}\"\n"
-            f"key_vault_name = \"{names['hub_name']}kv\"\n"
-            f"ai_services_name = \"{names['hub_name']}ais\"\n"
-            f"ai_foundry_hub_name = \"{names['hub_name']}hub\""
+            f"key_vault_name = \"{names['key_vault_name']}\"\n"
+            f"ai_services_name = \"{names['ai_services_name']}\"\n"
+            f"ai_foundry_hub_name = \"{names['ai_foundry_hub_name']}\"\n"
+            f"app_insights_name = \"{names['app_insights_name']}\""
         )
         tfvars_path = TERRAFORM_DIR / "terraform.tfvars"
         tfvars_path.write_text(tfvars_content, encoding="utf-8")
+
+        # Basic quota / usage precheck placeholder (future enhancement could call ARM usage APIs)
+        append_log(deployment_id, "[PRECHECK] Validando entorno (placeholder de cuotas).")
+        try:
+            acct = subprocess.check_output(["az", "account", "show", "-o", "json"]).decode()
+            sub_info = json.loads(acct)
+            append_log(deployment_id, f"[PRECHECK] Subscription activa: {sub_info.get('id')} - {sub_info.get('name')}")
+        except Exception as e:  # noqa
+            append_log(deployment_id, f"[PRECHECK][WARN] No se pudo leer 'az account show': {e}")
+        append_log(deployment_id, "[PRECHECK] (Futuro) Consultar cuotas específicas de Cognitive, AI Foundry y almacenamiento.")
 
         # Terraform init & apply
         await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=TERRAFORM_DIR)

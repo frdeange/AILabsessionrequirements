@@ -50,3 +50,33 @@ output "openai_deployment_name" {
 output "deployment_name" {
   value = var.model_deployment_name
 }
+
+output "ai_foundry_hub_id" {
+  value = azurerm_ai_foundry.hub.id
+}
+
+output "ai_foundry_hub_discovery_url" {
+  value       = try(azurerm_ai_foundry.hub.discovery_url, null)
+  description = "Discovery URL for the AI Foundry Hub (if exposed)."
+}
+
+output "ai_services_name" {
+  value = azurerm_ai_services.aiservices.name
+}
+
+output "key_vault_name" {
+  value = azurerm_key_vault.kv.name
+}
+
+output "app_insights_instrumentation_key" {
+  value       = try(azurerm_application_insights.appins.instrumentation_key, null)
+  description = "Instrumentation Key (deprecated but sometimes still needed)."
+}
+
+output "app_insights_connection_string" {
+  value = try(azurerm_application_insights.appins.connection_string, null)
+}
+
+output "app_insights_app_id" {
+  value = try(azurerm_application_insights.appins.app_id, null)
+}

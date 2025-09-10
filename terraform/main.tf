@@ -92,6 +92,7 @@ resource "azurerm_ai_foundry" "hub" {
   resource_group_name = azurerm_resource_group.rg.name
   storage_account_id  = azurerm_storage_account.stg.id
   key_vault_id        = azurerm_key_vault.kv.id
+  application_insights_id = azurerm_application_insights.appins.id
 
   identity { type = "SystemAssigned" }
 }
@@ -106,4 +107,12 @@ resource "azurerm_ai_foundry_project" "foundry" {
   tags = {
     env = "demo"
   }
+}
+
+# Application Insights (observability for hub/project usage)
+resource "azurerm_application_insights" "appins" {
+  name                = var.app_insights_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  application_type    = "web"
 }

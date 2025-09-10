@@ -43,3 +43,7 @@ variable "ai_services_name" {
 variable "ai_foundry_hub_name" {
   type = string
 }
+
+variable "app_insights_name" {
+  type = string
+}
