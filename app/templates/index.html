@@ -3,8 +3,8 @@
 {% block content %}
 <section class="hero">
   <div class="hero-head">
-    <h2>Provision Azure AI Building Blocks Faster</h2>
-    <p class="tagline">One-click ephemeral environment: Resource Group, Azure OpenAI (Cognitive Services), Storage Account, optional Azure AI Search, and a Foundry Project scaffold.</p>
+  <h2>Provision Azure AI Building Blocks Faster</h2>
+  <p class="tagline">One-click ephemeral environment: Resource Group, Azure AI Services, Foundry Hub + Project, Storage Account, optional Azure AI Search.</p>
   </div>
   <div class="grid cols-2">
     <div class="card">
@@ -27,9 +27,10 @@
           <label>Location</label>
           <select name="location" id="location_select"></select>
         </div>
+  <!-- Model deployment inputs simplificados: usamos defaults sin pedir versión, nombre lógico ni SKU -->
         <div>
-          <label>Model Deployment Name</label>
-          <select name="model_deployment_name">
+          <label>Model Name</label>
+          <select name="openai_model_name">
             <option value="gpt-4.1" selected>gpt-4.1</option>
             <option value="gpt-4.1-mini">gpt-4.1-mini</option>
             <option value="gpt-4o">gpt-4o</option>
@@ -41,13 +42,13 @@
           <input name="subscription_id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
         </div>
         <div class="checkbox-inline">
-          <input type="checkbox" id="include_search" name="include_search" />
+          <input type="checkbox" id="include_search" name="include_search" value="1" checked/>  
           <label for="include_search" style="margin:0; text-transform:none; letter-spacing:normal; font-size:.85rem; font-weight:500; color:var(--text);">Include Azure AI Search</label>
         </div>
         <div>
           <button class="primary" type="submit">Deploy Environment</button>
         </div>
-  <p class="notice">Terraform & Azure CLI must be available inside this container. If you leave Subscription ID empty the app will try <code>AZ_SUBSCRIPTION_ID</code> env var.</p>
+  <p class="notice form-note-span">Terraform & Azure CLI must be available inside this container. If you leave Subscription ID empty the app will try <code>AZ_SUBSCRIPTION_ID</code> env var.</p>
       </form>
     </div>
     <div class="card">
@@ -55,7 +56,7 @@
       <div class="description">
         <p>This lightweight UI orchestrates <strong>infrastructure provisioning</strong> for Azure AI enablement workshops or rapid PoCs. It automates consistent naming, executes Terraform to stand up required services, then enriches outputs by fetching access keys via Azure CLI.</p>
         <ul class="inline-list" style="margin:.8rem 0 1rem;">
-          <li>Resource Group</li><li>Azure OpenAI</li><li>Storage Account</li><li>Foundry Project</li><li>Optional Search</li>
+          <li>Resource Group</li><li>AI Services</li><li>Foundry Hub & Project</li><li>Storage Account</li><li>Key Vault</li><li>Optional Search</li>
         </ul>
         <p><strong>Ephemeral by design:</strong> you can destroy resources afterwards with <code>terraform destroy</code> or deleting the Resource Group.</p>
         <p><strong>Security note:</strong> Secret values appear in the results table for convenience only; rotate or store them securely before sharing.</p>

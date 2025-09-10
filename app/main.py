@@ -30,7 +30,6 @@ DEPLOYMENTS: Dict[str, Dict] = {}
 # Simple naming utility respecting some Azure limits
 # Storage account: 3-24 lower case letters/numbers only
 # Search service: 2-60 lower case letters/numbers
-# Cognitive (OpenAI) account: <= 63
 # Hub / Project (use similar pattern, enforce <= 40 for safety)
 
 def random_suffix(length: int = 5) -> str:
@@ -57,20 +56,20 @@ def build_names(base: str) -> Dict[str, str]:
         return (truncated + code + suf)[:limit]
     storage = compose(24, "stg")
     search = compose(60, "src")
-    openai = compose(40, "aoa")
     kv = compose(24, "kv")
     ais = compose(40, "ais")
     hub = compose(40, "hub")
     appi = compose(40, "appi")
     project = compose(30, "prj")
+    law = compose(40, "law")
     return {
         "storage_account_name": storage,
         "search_service_name": search,
-        "openai_account_name": openai,
         "key_vault_name": kv,
         "ai_services_name": ais,
         "ai_foundry_hub_name": hub,
         "app_insights_name": appi,
+        "log_analytics_workspace_name": law,
         "project_name": project,
         "suffix": suf,
     }
@@ -81,17 +80,16 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-ALLOWED_MODEL_DEPLOYMENTS = {"gpt-4.1","gpt-4.1-mini","gpt-4o","gpt-4o-mini"}
+ALLOWED_MODEL_NAMES = {"gpt-4.1","gpt-4.1-mini","gpt-4o","gpt-4o-mini"}
 
 @app.post("/deploy")
-
 async def start_deploy(
     request: Request,
     resource_group_base: str = Form(...),
     location: str = Form(...),
     include_search: Optional[str] = Form(None),
-    model_deployment_name: str = Form("gpt-4.1"),
-    subscription_id: Optional[str] = Form(None)
+    openai_model_name: str = Form("gpt-4.1"),
+    subscription_id: Optional[str] = Form(None),
 ):
     base_clean = sanitize_base(resource_group_base)
     if len(base_clean) < 3:
@@ -99,11 +97,15 @@ async def start_deploy(
     if len(base_clean) > 15:
         return templates.TemplateResponse("index.html", {"request": request, "error": "Resource group base too long (max 15)."})
 
-    # Validate model selection
-    if model_deployment_name not in ALLOWED_MODEL_DEPLOYMENTS:
+    names = build_names(base_clean)
+    if openai_model_name not in ALLOWED_MODEL_NAMES:
         return templates.TemplateResponse("index.html", {"request": request, "error": "Invalid model selection."})
 
-    names = build_names(base_clean)
+    # Defaults simplificados para el deployment (no se piden al usuario):
+    openai_model_version = ""  # omit to let platform choose
+    model_deployment_name = "chat"  # nombre lógico fijo
+    openai_deployment_sku = "GlobalStandard"
+    enable_model_deployment = True
     deployment_id = str(uuid.uuid4())
     DEPLOYMENTS[deployment_id] = {
         "status": "starting",
@@ -114,6 +116,10 @@ async def start_deploy(
             "resource_group_base": base_clean,
             "location": location,
             "include_search": include_search == "on",
+            "enable_model_deployment": enable_model_deployment,
+            "openai_model_name": openai_model_name,
+            "openai_model_version": openai_model_version,
+            "openai_deployment_sku": openai_deployment_sku,
             "model_deployment_name": model_deployment_name,
             # fallback to environment AZ_SUBSCRIPTION_ID if form empty
             "subscription_id": ((subscription_id or "").strip() or os.getenv("AZ_SUBSCRIPTION_ID", "").strip()),
@@ -269,6 +275,13 @@ async def ensure_azure_login(deployment_id: str):
         return
     if set_subscription(chosen):
         append_log(deployment_id, f"[AUTH] Subscription set ({strategy}): {chosen}")
+        # Persist auto-selected subscription so terraform.tfvars includes it
+        try:
+            if DEPLOYMENTS.get(deployment_id):
+                if not explicit:
+                    DEPLOYMENTS[deployment_id].setdefault("params", {})["subscription_id"] = chosen
+        except Exception:  # noqa
+            pass
     else:
         append_log(deployment_id, f"[WARN] Failed to set subscription ({chosen}).")
 
@@ -283,19 +296,25 @@ async def run_full_deployment(deployment_id: str):
         await ensure_azure_login(deployment_id)
         # Prepare terraform.tfvars
         tfvars_content = (
-            f"rg_name = \"{params['resource_group_base']}\"\n"
+            f"rg_name = \"RG-{params['resource_group_base']}\"\n"
             f"location = \"{params['location']}\"\n"
             f"include_search = {str(params['include_search']).lower()}\n"
             f"storage_account_name = \"{names['storage_account_name']}\"\n"
             f"search_service_name = \"{names['search_service_name']}\"\n"
-            f"openai_account_name = \"{names['openai_account_name']}\"\n"
-            f"model_deployment_name = \"{params['model_deployment_name']}\"\n"
             f"foundry_project_name = \"{names['project_name']}\"\n"
             f"key_vault_name = \"{names['key_vault_name']}\"\n"
             f"ai_services_name = \"{names['ai_services_name']}\"\n"
             f"ai_foundry_hub_name = \"{names['ai_foundry_hub_name']}\"\n"
-            f"app_insights_name = \"{names['app_insights_name']}\""
+            f"app_insights_name = \"{names['app_insights_name']}\"\n"
+            f"log_analytics_workspace_name = \"{names['log_analytics_workspace_name']}\"\n"
+            f"enable_model_deployment = {str(params['enable_model_deployment']).lower()}\n"
+            f"model_deployment_name = \"{params['model_deployment_name']}\"\n"
+            f"openai_model_name = \"{params['openai_model_name']}\"\n"
+            f"openai_model_version = \"{params['openai_model_version']}\"\n"
+            f"openai_deployment_sku = \"{params['openai_deployment_sku']}\""
         )
+        if params.get("subscription_id"):
+            tfvars_content += f"\nsubscription_id = \"{params['subscription_id']}\""
         tfvars_path = TERRAFORM_DIR / "terraform.tfvars"
         tfvars_path.write_text(tfvars_content, encoding="utf-8")
 
@@ -329,23 +348,6 @@ async def run_full_deployment(deployment_id: str):
         # Foundry project handled by Terraform
         DEPLOYMENTS[deployment_id]["status"] = "foundry"
         rg_name = params['resource_group_base']
-
-        # Retrieve keys for OpenAI (Cognitive Services)
-        try:
-            append_log(deployment_id, "Retrieving OpenAI account keys...")
-            openai_keys_raw = subprocess.check_output([
-                "az", "cognitiveservices", "account", "keys", "list",
-                "-n", names["openai_account_name"],
-                "-g", rg_name,
-                "-o", "json"
-            ])
-            openai_keys_json = json.loads(openai_keys_raw.decode())
-            DEPLOYMENTS[deployment_id]["outputs"].update({
-                "azure_openai_api_key": openai_keys_json.get("key1"),
-                "azure_openai_api_key_secondary": openai_keys_json.get("key2"),
-            })
-        except Exception as e:  # noqa
-            append_log(deployment_id, f"[WARN] Could not fetch OpenAI keys: {e}")
 
         # Retrieve Storage connection string & key
         try:

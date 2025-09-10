@@ -1,19 +1,10 @@
-output "openai_endpoint" {
-  value = azurerm_cognitive_account.openai.properties["endpoint"]
-}
-
-# Primary key (OpenAI) - accessible via listKeys data source; using az cli later for safety.
-# Provide placeholder output by referencing account id (for subsequent CLI call in app if needed)
-output "openai_account_id" {
-  value = azurerm_cognitive_account.openai.id
-}
 
 output "storage_blob_url" {
-  value = azurerm_storage_account.stg.primary_blob_endpoint
+  value = data.azurerm_storage_account.stg.primary_blob_endpoint
 }
 
 output "storage_account_name" {
-  value = azurerm_storage_account.stg.name
+  value = data.azurerm_storage_account.stg.name
 }
 
 output "search_service_name" {
@@ -34,22 +25,8 @@ output "foundry_project_location" {
 }
 
 # Attempt to expose Foundry project endpoint (attribute name subject to provider updates)
-output "foundry_project_endpoint" {
-  value       = try(azurerm_ai_foundry_project.foundry.endpoint, null)
-  description = "Foundry project endpoint if exposed by provider; may be null if not yet supported."
-}
+/* Provider (v4.43.0) no expone todavía endpoint directo del proyecto; output removido */
 
-output "openai_deployment_id" {
-  value = azurerm_cognitive_deployment.openai_deployment.id
-}
-
-output "openai_deployment_name" {
-  value = azurerm_cognitive_deployment.openai_deployment.name
-}
-
-output "deployment_name" {
-  value = var.model_deployment_name
-}
 
 output "ai_foundry_hub_id" {
   value = azurerm_ai_foundry.hub.id
@@ -64,6 +41,22 @@ output "ai_services_name" {
   value = azurerm_ai_services.aiservices.name
 }
 
+output "ai_services_endpoint" {
+  value = try(azurerm_ai_services.aiservices.endpoint, null)
+}
+
+output "openai_deployment_id" {
+  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model[0].id : null
+}
+
+output "openai_deployment_name" {
+  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model[0].name : null
+}
+
+output "openai_model_name" {
+  value = var.openai_model_name
+}
+
 output "key_vault_name" {
   value = azurerm_key_vault.kv.name
 }
@@ -71,12 +64,31 @@ output "key_vault_name" {
 output "app_insights_instrumentation_key" {
   value       = try(azurerm_application_insights.appins.instrumentation_key, null)
   description = "Instrumentation Key (deprecated but sometimes still needed)."
+  sensitive   = true
 }
 
 output "app_insights_connection_string" {
   value = try(azurerm_application_insights.appins.connection_string, null)
+  sensitive = true
 }
 
 output "app_insights_app_id" {
   value = try(azurerm_application_insights.appins.app_id, null)
+}
+
+# Log Analytics Workspace outputs
+output "log_analytics_workspace_id" {
+  value = azurerm_log_analytics_workspace.law.id
+}
+
+output "log_analytics_workspace_name" {
+  value = azurerm_log_analytics_workspace.law.name
+}
+
+output "hub_principal_id" {
+  value = try(azurerm_ai_foundry.hub.identity[0].principal_id, null)
+}
+
+output "ai_services_principal_id" {
+  value = try(azurerm_ai_services.aiservices.identity[0].principal_id, null)
 }
