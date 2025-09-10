@@ -1,10 +1,10 @@
 
 output "storage_blob_url" {
-  value = data.azurerm_storage_account.stg.primary_blob_endpoint
+  value = azurerm_storage_account.stg.primary_blob_endpoint
 }
 
 output "storage_account_name" {
-  value = data.azurerm_storage_account.stg.name
+  value = azurerm_storage_account.stg.name
 }
 
 output "search_service_name" {
@@ -12,16 +12,16 @@ output "search_service_name" {
 }
 
 output "foundry_project_id" {
-  value = azurerm_ai_foundry_project.foundry.id
+  value = azapi_resource.ai_foundry_project.id
 }
 
 output "foundry_project_name" {
-  value = azurerm_ai_foundry_project.foundry.name
+  value = azapi_resource.ai_foundry_project.name
 }
 
 # Endpoint may be exposed via properties; placeholder if attribute available in future provider versions.
 output "foundry_project_location" {
-  value = azurerm_ai_foundry_project.foundry.location
+  value = azapi_resource.ai_foundry_project.location
 }
 
 # Attempt to expose Foundry project endpoint (attribute name subject to provider updates)
@@ -29,55 +29,70 @@ output "foundry_project_location" {
 
 
 output "ai_foundry_hub_id" {
-  value = azurerm_ai_foundry.hub.id
+  value = azapi_resource.hub.id
 }
 
 output "ai_foundry_hub_discovery_url" {
-  value       = try(azurerm_ai_foundry.hub.discovery_url, null)
+  value       = try(azapi_resource.hub.output.properties.endpoint, null)
   description = "Discovery URL for the AI Foundry Hub (if exposed)."
 }
 
 output "ai_services_name" {
-  value = azurerm_ai_services.aiservices.name
+  value = azapi_resource.hub.name
 }
 
 output "ai_services_endpoint" {
-  value       = try(azurerm_ai_services.aiservices.endpoint, null)
+  value       = try(azapi_resource.hub.output.properties.endpoint, null)
   description = "Primary Azure AI Services cognitive endpoint (.cognitiveservices.azure.com)."
 }
 
 # Derived OpenAI endpoint (same subdomain with .openai.azure.com) – may differ from cognitive endpoint.
 output "openai_endpoint" {
-  value       = try(replace(azurerm_ai_services.aiservices.endpoint, ".cognitiveservices.azure.com", ".openai.azure.com"), null)
+  value       = try(replace(azapi_resource.hub.output.properties.endpoint, ".cognitiveservices.azure.com", ".openai.azure.com"), null)
   description = "Derived Azure OpenAI endpoint (.openai.azure.com)."
 }
 
 # Derived AI Inference endpoint (preview namespace .services.ai.azure.com)
 output "ai_inference_endpoint" {
-  value       = try(replace(azurerm_ai_services.aiservices.endpoint, ".cognitiveservices.azure.com", ".services.ai.azure.com"), null)
+  value       = try(replace(azapi_resource.hub.output.properties.endpoint, ".cognitiveservices.azure.com", ".services.ai.azure.com"), null)
   description = "Derived Azure AI Inference endpoint (.services.ai.azure.com)."
 }
 
 output "openai_deployment_id" {
-  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model[0].id : null
+  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model.id : null
 }
 
 output "openai_deployment_name" {
-  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model[0].name : null
+  value = var.enable_model_deployment ? azurerm_cognitive_deployment.model.name : null
 }
 
 output "openai_model_name" {
   value = var.openai_model_name
 }
 
+# === REQUIRED INFO FOR EXERCISES ===
+
+output "azure_openai_key" {
+  value       = data.azurerm_cognitive_account.hub_keys.primary_access_key
+  sensitive   = true
+  description = "Primary access key for Azure OpenAI"
+}
+
+output "azure_search_admin_key" {
+  value       = var.include_search ? data.azurerm_search_service.search_keys[0].primary_key : null
+  sensitive   = true
+  description = "Primary admin key for Azure AI Search"
+}
+
+output "azure_foundry_project_url" {
+  value       = try(azapi_resource.ai_foundry_project.output.properties.endpoints["AI Foundry API"], null)
+  description = "API URL to access the Azure AI Foundry Project"
+}
+
 output "search_service_endpoint" {
   # azurerm_search_service does not expose a 'url' attribute; endpoint is deterministic
   value       = var.include_search ? "https://${azurerm_search_service.search[0].name}.search.windows.net" : null
   description = "Primary endpoint of Azure AI Search service (derived)."
-}
-
-output "key_vault_name" {
-  value = azurerm_key_vault.kv.name
 }
 
 output "app_insights_instrumentation_key" {
@@ -105,9 +120,9 @@ output "log_analytics_workspace_name" {
 }
 
 output "hub_principal_id" {
-  value = try(azurerm_ai_foundry.hub.identity[0].principal_id, null)
+  value = try(azapi_resource.hub.output.identity.principalId, null)
 }
 
-output "ai_services_principal_id" {
-  value = try(azurerm_ai_services.aiservices.identity[0].principal_id, null)
+output "ai_foundry_project_principal_id" {
+  value = try(azapi_resource.ai_foundry_project.output.identity.principalId, null)
 }

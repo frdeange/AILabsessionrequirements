@@ -65,7 +65,6 @@ def build_names(base: str) -> Dict[str, str]:
     return {
         "storage_account_name": storage,
         "search_service_name": search,
-        "key_vault_name": kv,
         "ai_services_name": ais,
         "ai_foundry_hub_name": hub,
         "app_insights_name": appi,
@@ -103,7 +102,8 @@ async def start_deploy(
 
     # Defaults simplificados para el deployment (no se piden al usuario):
     openai_model_version = ""  # omit to let platform choose
-    model_deployment_name = "chat"  # nombre lógico fijo
+    # Deployment name igual al nombre de modelo (petición usuario)
+    model_deployment_name = openai_model_name
     openai_deployment_sku = "GlobalStandard"
     enable_model_deployment = True
     deployment_id = str(uuid.uuid4())
@@ -304,7 +304,6 @@ async def run_full_deployment(deployment_id: str):
             f"storage_account_name = \"{names['storage_account_name']}\"\n"
             f"search_service_name = \"{names['search_service_name']}\"\n"
             f"foundry_project_name = \"{names['project_name']}\"\n"
-            f"key_vault_name = \"{names['key_vault_name']}\"\n"
             f"ai_services_name = \"{names['ai_services_name']}\"\n"
             f"ai_foundry_hub_name = \"{names['ai_foundry_hub_name']}\"\n"
             f"app_insights_name = \"{names['app_insights_name']}\"\n"

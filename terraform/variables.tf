@@ -23,10 +23,6 @@ variable "foundry_project_name" {
   type = string
 }
 
-variable "key_vault_name" {
-  type = string
-}
-
 variable "ai_services_name" {
   type = string
 }
@@ -58,8 +54,8 @@ variable "enable_model_deployment" {
 
 variable "model_deployment_name" {
   type        = string
-  description = "Nombre lógico del deployment (p.ej. chat, gpt4)."
-  default     = "chat"
+  description = "Nombre lógico del deployment; si vacío se usará openai_model_name."
+  default     = ""
 }
 
 variable "openai_model_name" {

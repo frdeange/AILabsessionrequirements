@@ -1,21 +1,98 @@
 {% extends 'base.html' %}
 {% block title %}Results · Azure AI Provisioner{% endblock %}
 {% block content %}
-<h2 style="margin-top:0;">Provisioned Outputs</h2>
+
+<!-- Required Info for Exercises Section -->
+<h2 style="margin-top:0;">Required Info for Exercises</h2>
+<div class="results-table-wrapper">
+  <table class="results-table">
+    <thead><tr><th>Key</th><th>Value</th><th>Copy</th></tr></thead>
+    <tbody>
+      <!-- OpenAI Endpoint -->
+      {% if data.outputs.openai_endpoint %}
+      <tr>
+        <td class="key">OpenAI Endpoint</td>
+        <td class="value">{{ data.outputs.openai_endpoint }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.openai_endpoint }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- Azure OpenAI Key -->
+      {% if data.outputs.azure_openai_key %}
+      <tr>
+        <td class="key">Azure OpenAI Key</td>
+        <td class="value secret">{{ data.outputs.azure_openai_key }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.azure_openai_key }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- OpenAI Deployment Name -->
+      {% if data.outputs.openai_deployment_name %}
+      <tr>
+        <td class="key">OpenAI Deployment Name</td>
+        <td class="value">{{ data.outputs.openai_deployment_name }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.openai_deployment_name }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- Azure Foundry Project URL -->
+      {% if data.outputs.azure_foundry_project_url %}
+      <tr>
+        <td class="key">Azure Foundry Project URL</td>
+        <td class="value">{{ data.outputs.azure_foundry_project_url }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.azure_foundry_project_url }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- Azure AI Search URL -->
+      {% if data.outputs.search_service_endpoint %}
+      <tr>
+        <td class="key">Azure AI Search URL</td>
+        <td class="value">{{ data.outputs.search_service_endpoint }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.search_service_endpoint }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- Azure AI Search Key -->
+      {% if data.outputs.azure_search_admin_key %}
+      <tr>
+        <td class="key">Azure AI Search Key</td>
+        <td class="value secret">{{ data.outputs.azure_search_admin_key }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.azure_search_admin_key }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- App Insights Connection String -->
+      {% if data.outputs.app_insights_connection_string %}
+      <tr>
+        <td class="key">App Insights Connection String</td>
+        <td class="value secret">{{ data.outputs.app_insights_connection_string }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.app_insights_connection_string }}">Copy</button></td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Additional Details Section -->
+<h2 style="margin-top:2rem;">Additional Details</h2>
 <div class="results-table-wrapper">
   <table class="results-table">
     <thead><tr><th>Key</th><th>Value</th><th>Copy</th></tr></thead>
     <tbody>
       {% for k, v in data.outputs.items() %}
-      <tr>
-        <td class="key">{{ k }}</td>
-        <td class="value {% if 'key' in k %}secret{% endif %}">{{ v }}</td>
-        <td><button class="copy-btn" data-value="{{ v }}">Copy</button></td>
-      </tr>
+        {% if k not in ['openai_endpoint', 'azure_openai_key', 'openai_deployment_name', 'azure_foundry_project_url', 'search_service_endpoint', 'azure_search_admin_key', 'app_insights_connection_string'] %}
+        <tr>
+          <td class="key">{{ k }}</td>
+          <td class="value {% if 'key' in k or 'connection_string' in k %}secret{% endif %}">{{ v }}</td>
+          <td><button class="copy-btn" data-value="{{ v }}">Copy</button></td>
+        </tr>
+        {% endif %}
       {% endfor %}
     </tbody>
   </table>
 </div>
+
 <p style="margin-top:1.4rem; font-size:.75rem; color:var(--text-dim);">Remember to rotate keys before sharing externally. Destroy resources when no longer needed.</p>
 <p><a href="/">New deployment</a></p>
 {% endblock %}

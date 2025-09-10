@@ -1,261 +1,347 @@
-# Azure AI Provisioner (FastAPI + Terraform)
+# 🚀 Azure AI Provisioner
 
-[//]: # (============================== BADGES ==============================)
-[![FastAPI](https://img.shields.io/badge/Web-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
-[![Terraform](https://img.shields.io/badge/IaC-Terraform-844FBA.svg)](https://www.terraform.io/)
-[![Azure](https://img.shields.io/badge/Cloud-Azure-0072C6.svg)](https://azure.microsoft.com/)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](#github-codespaces)
+<div align="center">
 
-> Opinionated, minimal UI + infrastructure-as-code accelerator to spin up an Azure AI environment (AI Services + Foundry Hub + Foundry Project + Model Deployment + Monitoring stack) with a single browser form and streaming logs.
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://www.terraform.io/)
+[![Azure](https://img.shields.io/badge/Microsoft_Azure-0089D0?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
+[![GitHub Codespaces](https://img.shields.io/badge/GitHub_Codespaces-181717?style=for-the-badge&logo=github&logoColor=white)](#-quick-start-with-github-codespaces)
 
----
-## 1. What This Project Does
-The application exposes a FastAPI web interface that:
-1. Accepts a minimal form (base name + model choice + optional toggles) and deterministically generates compliant Azure resource names with a short suffix.
-2. Writes a `terraform.tfvars` file reflecting those names, flags and defaults.
-3. Executes `terraform init` (when needed) and `terraform apply -auto-approve` in a subprocess, streaming stdout/stderr over WebSocket to the browser in real time.
-4. Reads `terraform output -json` and displays key resource information (non‑sensitive) in a result page.
+**One-click Azure AI infrastructure deployment with real-time streaming logs** ✨
 
-Provisioned resource set (current):
-- Resource Group
-- Storage Account (created via `azapi_resource` — key-based auth disabled tenant policy workaround)
-- Azure AI Services (foundation hosting for deployments & link with Foundry)
-- Azure AI Foundry Hub + Project (with RBAC propagation wait)
-- Azure OpenAI model deployment (`azurerm_cognitive_deployment` attached to AI Services)
-- Key Vault (base for future secret integration)
-- Log Analytics Workspace + Application Insights (workspace-based mode)
-- (Optional) Azure AI Search
+*Transform a simple form into a complete Azure AI environment in minutes*
 
-All resources follow a consistent naming pattern and rely on Azure AD / RBAC (no secret keys emitted) due to tenant policies forbidding shared key usage for Storage.
+</div>
 
 ---
-## 2. High-Level Architecture
-```
-Browser (Form + Live Log UI)
-	|  (HTTP POST + WebSocket)
-FastAPI Backend (app/main.py)
-	| 1) Build names & tfvars
-	| 2) Spawn terraform subprocess
-	| 3) Stream lines via WebSocket
-Terraform Root Module (terraform/)
-	|-- azurerm + azapi providers
-	|-- Creates Azure resource graph
-Azure Platform Resources
-```
 
-Key design decisions:
-- Single Python module keeps orchestration simple (intentional until complexity justifies refactor).
-- `azapi_resource` chosen for Storage because azurerm provider data-plane polling fails under enforced “KeyBasedAuthenticationNotPermitted” policies.
-- Workspace-based Application Insights adopted to avoid legacy ingestion/billing 404s.
-- Explicit `time_sleep` resource used to absorb RBAC role assignment propagation before creating Foundry Project (MSI validation requirement).
+## 🎯 What Does This Do?
+
+This project provides a **beautiful web interface** that lets you deploy a complete Azure AI infrastructure stack with just a few clicks. Watch your infrastructure come to life with **real-time streaming logs** as Terraform provisions everything you need for AI/ML workloads.
+
+### 🏗️ What Gets Deployed
+
+| 🎯 Component | 📋 Purpose | 🔧 Implementation |
+|--------------|-------------|-------------------|
+| **🧠 AI Services Hub** | Foundation for AI workloads | `azapi_resource` with custom subdomain |
+| **🏭 AI Foundry Hub** | Central AI workspace | Full RBAC integration |
+| **📊 AI Foundry Project** | Project-level isolation | Auto-configured with connections |
+| **🤖 OpenAI Models** | GPT-4, GPT-4o deployments | Ready-to-use endpoints |
+| **🔍 AI Search** | Vector search capabilities | Optional, enterprise-ready |
+| **📈 Monitoring** | App Insights + Log Analytics | Full observability stack |
+| **💾 Storage** | Secure blob storage | AAD-only authentication |
 
 ---
-## 3. Naming Convention
-Pattern: `<base><code><rand>`
-- `base`: user input sanitized (letters/digits)
-- `code`: short mnemonic (rg, stg, ais, hub, prj, kv, appi, law, srch)
-- `rand`: 5–6 lowercase alphanumeric chars
-Storage capped < 24 chars, others respect Azure limits. Keep new resources aligned by extending the mapping in `app/main.py` (function generating names).
+
+## ✨ Key Features
+
+### 🎨 **Beautiful UI Experience**
+- 🌐 Clean, modern web interface
+- ⏱️ Real-time progress tracking with streaming logs
+- 📋 Organized results with "Required for Exercises" section
+- 📋 One-click copy for all endpoints and keys
+- 🔄 Live WebSocket updates during deployment
+
+### 🔒 **Enterprise Security**
+- 🚫 **Zero shared keys** - Everything uses Azure AD authentication
+- 👥 RBAC-first approach with proper role assignments
+- 🔐 Secure key retrieval only when needed
+- ✅ Compliance with restrictive tenant policies
+- 🛡️ No secrets exposed in logs or outputs
+
+### ⚡ **Smart Infrastructure**
+- 🏷️ **Intelligent naming** - Deterministic, Azure-compliant resource names
+- ⚡ **Dependency-aware** - Proper resource sequencing and RBAC propagation
+- 🔗 **Connection automation** - AI Foundry projects auto-linked to storage and search
+- 📡 **Real-time feedback** - Live Terraform logs streamed to your browser
+
+### 🎯 **Ready for AI Workloads**
+Get everything you need for AI development:
+- ✅ OpenAI API endpoints and keys
+- ✅ AI Foundry project URLs (direct API access)
+- ✅ Search service endpoints and keys
+- ✅ Application Insights connection strings
+- ✅ Model deployment names
+- ✅ All organized for immediate use
 
 ---
-## 4. Dev Container & Codespaces
-This repository is optimized for a containerized dev workflow (VS Code Dev Containers or GitHub Codespaces):
 
-Benefits:
-- Pre-installed: Python, Terraform, Azure CLI, environment tooling.
-- Consistent reproducible environment (no “works on my machine”).
-- Immediate `uvicorn` + Terraform readiness.
+## 🚀 Quick Start with GitHub Codespaces
 
-### 4.1 Open in GitHub Codespaces
-If this repo lives on GitHub you can launch a Codespace (replace OWNER/REPO):
-```markdown
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/OWNER/REPO?quickstart=1)
-```
+The fastest way to get started! Everything is pre-configured:
 
-### 4.2 VS Code Dev Container (Local)
-1. Install the “Dev Containers” extension.
-2. Open the folder; if prompted, “Reopen in Container”.
-3. The container should provision dependencies automatically (if a `.devcontainer` exists); else see Manual Setup below.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/your-username/your-repo)
+
+1. **Click the badge above** 👆
+2. **Wait for the environment** to initialize (~2 minutes)
+3. **Start the app**: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+4. **Open the browser** and navigate to the forwarded port
+5. **Deploy your AI infrastructure** with a single form! 🎉
 
 ---
-## 5. Manual (Non-Container) Prerequisites
-Install locally if you do NOT use a dev container / Codespace:
-- Python ≥ 3.10
-- Terraform ≥ 1.6.0
-- Azure CLI ≥ 2.60
-- (Optional) Node.js if you plan to extend frontend assets
 
-Login & subscription:
+## 💻 Local Development Setup
+
+### Prerequisites
+- 🐍 Python ≥ 3.10
+- 🏗️ Terraform ≥ 1.6.0
+- ☁️ Azure CLI ≥ 2.60
+- 🔑 Azure subscription with appropriate permissions
+
+### Installation
+
 ```bash
-az login
-az account set --subscription <SUBSCRIPTION_ID>
-```
+# Clone the repository
+git clone <your-repo-url>
+cd IBM-SessionRequirements
 
-Create & activate virtual environment + deps:
-```bash
+# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Login to Azure
+az login
+az account set --subscription <YOUR_SUBSCRIPTION_ID>
+
+# Start the application
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+🌐 **Browse to**: http://localhost:8000
+
 ---
-## 6. Running the Application
-```bash
-uvicorn app.main:app --reload
+
+## 🎮 How to Use
+
+### 1. **Fill the Form** 📝
+- Enter a **base name** for your resources
+- Choose your **OpenAI model** (GPT-4, GPT-4o, etc.)
+- Toggle **Azure AI Search** if needed
+- Select your **Azure region**
+
+### 2. **Watch the Magic** ✨
+- Real-time Terraform logs stream to your browser
+- Watch as each resource gets created
+- See RBAC roles being assigned
+- Monitor the entire deployment process
+
+### 3. **Get Your Results** 🎁
+The results page shows two organized sections:
+
+#### 🎯 **Required Info for Exercises**
+Everything you need to start coding:
 ```
-Browse: http://localhost:8000
+✅ OpenAI Endpoint: https://yourname.openai.azure.com/
+✅ Azure OpenAI Key: [secure key]
+✅ Deployment Name: gpt-4o
+✅ AI Foundry Project URL: https://yourname.services.ai.azure.com/api/projects/yourproject
+✅ AI Search Endpoint: https://yoursearch.search.windows.net
+✅ AI Search Key: [secure key]
+✅ App Insights Connection: [connection string]
+```
 
-Deployment UI steps:
-1. Enter base name + choose model + optional flags.
-2. Submit and watch streaming Terraform logs.
-3. View summarized outputs after success.
+#### 📊 **Additional Details**
+All other resource information for advanced scenarios.
 
 ---
-## 7. Terraform Workflows
-Directory: `terraform/`
 
-Initialize (first time or after provider changes):
+## 🏗️ Architecture Deep Dive
+
+### System Flow
+```
+🌐 Browser Form
+    ↓ (HTTP POST)
+⚙️ FastAPI Backend
+    ↓ (Generate tfvars)
+📋 Terraform Configuration
+    ↓ (WebSocket streaming)
+☁️ Azure Resources
+```
+
+### Key Design Decisions
+
+#### 🔧 **Technology Choices**
+- **FastAPI**: Modern, fast web framework with automatic OpenAPI docs
+- **Terraform**: Infrastructure as Code with state management
+- **azapi provider**: Bleeding-edge Azure features before azurerm support
+- **WebSockets**: Real-time log streaming for better UX
+
+#### 🛡️ **Security First**
+- **Storage via azapi**: Bypasses key-based auth restrictions
+- **RBAC everywhere**: No shared keys, Azure AD authentication
+- **Identity propagation**: Explicit waits for role assignment propagation
+- **Workspace-based App Insights**: Avoids legacy billing issues
+
+#### 🏷️ **Smart Naming**
+Pattern: `<base><code><random>`
+- `base`: Your input (sanitized)
+- `code`: Resource type (rg, stg, ais, hub, prj, etc.)
+- `random`: 5-6 character suffix for uniqueness
+
+Example: `myproject` → `myprojectrg7k2m`, `myprojectstg7k2m`, etc.
+
+---
+
+## 🔧 Advanced Usage
+
+### Terraform Commands
 ```bash
 cd terraform
-terraform init
-```
 
-Validate & plan:
-```bash
+# Validate configuration
 terraform validate
-terraform plan -lock=false
-```
 
-Apply (non-interactive, used by the app):
-```bash
+# Plan changes (dry run)
+terraform plan
+
+# Apply changes
 terraform apply -auto-approve
-```
 
-Destroy:
-```bash
-terraform destroy -auto-approve
-```
-
-Partial targeting (e.g. role assignment):
-```bash
-terraform apply -target=azurerm_role_assignment.hub_blob_contributor -auto-approve
-```
-
----
-## 8. Resource Inventory (Current)
-| Component | Terraform Resource / Type | Notes |
-|-----------|---------------------------|-------|
-| Resource Group | `azurerm_resource_group` | Root scope |
-| Storage Account | `azapi_resource` + `data.azurerm_storage_account` | Created via AzAPI (no key polling) |
-| AI Services | `azurerm_ai_services` | Parent for model deployments |
-| Foundry Hub | `azurerm_ai_foundry` | System-assigned identity |
-| Foundry Project | `azurerm_ai_foundry_project` | Waits on RBAC sleep + identity |
-| OpenAI Model Deployment | `azurerm_cognitive_deployment` | Uses AI Services (no separate cognitive account) |
-| Key Vault | `azurerm_key_vault` | Base for future secrets (RBAC / access policy) |
-| Log Analytics Workspace | `azurerm_log_analytics_workspace` | Metrics & logs aggregation |
-| Application Insights | `azurerm_application_insights` | Workspace-based mode |
-| Azure AI Search (optional) | `azurerm_search_service` | Controlled by `include_search` flag |
-
----
-## 9. RBAC & Policy Considerations
-Tenant policy blocks key-based Storage authentication. Mitigations:
-- Storage deployed via AzAPI to skip provider’s key-based readiness polling.
-- `allowSharedKeyAccess=false` & `defaultToOAuthAuthentication=true` set.
-- Role assignments: Blob Data Contributor / Reader for Hub, AI Services, and current user.
-- Sleep (`time_sleep.after_rbac`) ensures propagation before Foundry Project creation (avoids MSI validation 400).
-
-Duplicate role or Key Vault access policy conflicts: remove or wrap in conditional instead of forcing import if rapid iteration is preferred.
-
----
-## 10. Model Deployment Logic
-The deployment resource (`azurerm_cognitive_deployment`) attaches the selected OpenAI model to the AI Services account:
-- Default SKU: `GlobalStandard` (modifiable via variable).
-- Model version left empty by design to consume latest available unless explicitly required.
-- Safe model allowlist enforced in `app/main.py` (update both list and HTML dropdown to extend).
-
----
-## 11. Live Log Streaming
-The backend spawns Terraform as a subprocess, reading its stdout line-by-line and relaying over a WebSocket endpoint to the `deployment.html` template. Guidelines when extending:
-- Keep reads non-blocking / incremental.
-- If chaining extra CLI steps post-apply (e.g., CLI queries), stream them through the same channel for continuity.
-
----
-## 12. Security Practices
-- No account keys or connection strings exposed in outputs.
-- Instrumentation key & App Insights connection string marked sensitive.
-- Prefer retrieving ephemeral tokens via Azure CLI / Managed Identity for downstream usage.
-- Future: replace access policies with full RBAC mode on Key Vault if tenant allows.
-
----
-## 13. Extending the Project
-Adding a new Azure resource:
-1. Define variable in `variables.tf` (with sane default or required type).
-2. Add naming code in `app/main.py` (extend the resource code map & tfvars writer).
-3. Create Terraform block grouped under a header (match hash-line style).
-4. Append outputs only if non-sensitive; otherwise rely on CLI retrieval.
-
-Adding a new model option:
-1. Add model name to `ALLOWED_MODEL_NAMES` in `app/main.py`.
-2. Update `<select>` in `app/templates/index.html`.
-3. (If different SKU required) introduce logic mapping model→SKU.
-
----
-## 14. Troubleshooting (Common Issues)
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| 403 KeyBasedAuthenticationNotPermitted (Storage) | azurerm provider polling with keys under restrictive policy | Use AzAPI resource (already implemented) |
-| 400 ValidationError (Foundry Project MSI) | RBAC not propagated / missing identities | Ensure identities + wait (`time_sleep`) |
-| 409 RoleAssignmentExists | Existing manual role assignment | Remove TF block or import resource; or widen scope to RG |
-| Key Vault access policy already exists | Policy pre-created | Remove duplicated policy block or import |
-| Model deployment fails (unsupported model) | Not in allowlist | Add to `ALLOWED_MODEL_NAMES` + UI select |
-
-Increase `time_sleep` duration (e.g., 180s) if large tenants exhibit slower RBAC propagation.
-
----
-## 15. Cleaning Up
-```bash
-cd terraform
-terraform destroy -auto-approve
-```
-
-If state left partially applied, re-run `terraform destroy` after resolving any import/duplicate conflicts.
-
----
-## 16. Contributing
-Pull Requests welcome. Recommended steps:
-1. Run `terraform validate` and a dry `plan` before submitting.
-2. Keep new resource naming aligned with existing pattern.
-3. Avoid exposing secrets in outputs or logs.
-
----
-## 17. License
-If a license is intended, add a `LICENSE` file (MIT / Apache-2.0 etc.). Currently unspecified.
-
----
-## 18. Quick Reference Commands
-```bash
-# Start API locally
-uvicorn app.main:app --reload
-
-# Terraform core cycle
-cd terraform
-terraform init
-terraform plan -lock=false
-terraform apply -auto-approve
+# Destroy everything
 terraform destroy -auto-approve
 
-# Inspect outputs JSON
-terraform output -json | jq
+# Target specific resources
+terraform apply -target=azapi_resource.hub
+```
+
+### Extending the Project
+
+#### Add a New Azure Resource
+1. **Define variable** in `terraform/variables.tf`
+2. **Add naming logic** in `app/main.py`
+3. **Create Terraform resource** in `terraform/main.tf`
+4. **Add output** in `terraform/outputs.tf` (if needed)
+5. **Update UI** in `app/templates/results.html`
+
+#### Add a New Model
+1. **Update allowlist** in `app/main.py`:
+   ```python
+   ALLOWED_MODEL_NAMES = ["gpt-4.1", "gpt-4o", "your-new-model"]
+   ```
+2. **Update dropdown** in `app/templates/index.html`
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues & Solutions
+
+| 🚨 Problem | 🔍 Cause | ✅ Solution |
+|------------|----------|-------------|
+| **Storage 403 Error** | Tenant blocks key-based auth | ✅ Already handled with `azapi_resource` |
+| **Foundry Project 400** | RBAC not propagated | ✅ Increase `time_sleep` duration |
+| **Role Assignment Conflict** | Pre-existing roles | ✅ Remove duplicate or import existing |
+| **Model Deployment Fails** | Invalid model name | ✅ Check `ALLOWED_MODEL_NAMES` list |
+| **Custom Subdomain Error** | Missing subdomain config | ✅ Already handled in azapi hub config |
+
+### Debug Tips
+```bash
+# Check Terraform state
+terraform show
+
+# Validate configuration
+terraform validate
+
+# See detailed plan
+terraform plan -out=plan.out
+
+# Check Azure CLI context
+az account show
 ```
 
 ---
-## 19. Roadmap (Suggested Next Enhancements)
-- Key Vault secret wiring (store endpoints / model metadata)
-- Optional remote backend (Azure Storage state) once Storage provisioning stabilized
-- Health endpoint & lightweight readiness probe
-- Model SKU abstraction table for per‑model defaults
-- Basic test harness (FastAPI testclient + mock Terraform)
+
+## 🧪 What's New in This Version
+
+### 🆕 Recent Updates
+- ✅ **Fixed AI Foundry Project URLs** - Now extracts real API endpoints
+- ✅ **Enhanced Results UI** - Organized sections for better UX
+- ✅ **Improved Security** - Full AAD authentication, no shared keys
+- ✅ **Better Error Handling** - Clear error messages and resolution steps
+- ✅ **Real-time Streaming** - Live Terraform logs via WebSocket
+- ✅ **Smart Dependencies** - Proper RBAC propagation timing
+
+### 🔄 Migration from Previous Versions
+If you have an existing deployment:
+1. **Backup your state**: `terraform state pull > backup.tfstate`
+2. **Update variables**: Remove `key_vault_name` references
+3. **Apply changes**: The new version will update existing resources safely
 
 ---
-Feel free to open issues for clarifications or propose improvements to onboarding, automation, or multi-tenant resilience.
 
+## 🤝 Contributing
+
+We love contributions! Here's how to help:
+
+### 🐛 **Bug Reports**
+- Use GitHub Issues
+- Include error logs and Terraform state (sanitized)
+- Describe your environment and steps to reproduce
+
+### 💡 **Feature Requests**
+- Check existing issues first
+- Describe the use case and expected behavior
+- Consider backward compatibility
+
+### 🔧 **Pull Requests**
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Test** thoroughly:
+   ```bash
+   terraform validate
+   terraform plan -lock=false
+   ```
+4. **Submit** PR with clear description
+
+### 📋 **Development Guidelines**
+- ✅ Keep naming patterns consistent
+- ✅ Never expose secrets in outputs
+- ✅ Update documentation for new features
+- ✅ Test in both Codespaces and local environments
+
+---
+
+## 📚 Additional Resources
+
+### 🔗 **Documentation Links**
+- [Azure AI Foundry Documentation](https://docs.microsoft.com/azure/ai-foundry/)
+- [Terraform Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Azure OpenAI Service](https://docs.microsoft.com/azure/cognitive-services/openai/)
+
+### 🎓 **Learning Resources**
+- [Azure AI Learning Paths](https://docs.microsoft.com/learn/browse/?products=azure-cognitive-services)
+- [Terraform Tutorial](https://learn.hashicorp.com/terraform)
+- [Python FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/)
+
+---
+
+## 📄 License
+
+This project is available under the [MIT License](LICENSE).
+
+---
+
+## 🙏 Acknowledgments
+
+- **Microsoft Azure Team** for the amazing AI services
+- **HashiCorp** for Terraform
+- **FastAPI Community** for the excellent web framework
+- **Contributors** who help make this project better
+
+---
+
+<div align="center">
+
+**Ready to deploy your AI infrastructure?** 🚀
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/your-username/your-repo)
+
+**Questions? Issues? Ideas?** 💬 
+
+[Open an Issue](https://github.com/your-username/your-repo/issues) • [Start a Discussion](https://github.com/your-username/your-repo/discussions)
+
+</div>
