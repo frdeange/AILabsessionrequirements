@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Results · Azure AI Provisioner{% endblock %}
+{% block content %}
+<h2 style="margin-top:0;">Provisioned Outputs</h2>
+<div class="results-table-wrapper">
+  <table class="results-table">
+    <thead><tr><th>Key</th><th>Value</th><th>Copy</th></tr></thead>
+    <tbody>
+      {% for k, v in data.outputs.items() %}
+      <tr>
+        <td class="key">{{ k }}</td>
+        <td class="value {% if 'key' in k %}secret{% endif %}">{{ v }}</td>
+        <td><button class="copy-btn" data-value="{{ v }}">Copy</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p style="margin-top:1.4rem; font-size:.75rem; color:var(--text-dim);">Remember to rotate keys before sharing externally. Destroy resources when no longer needed.</p>
+<p><a href="/">New deployment</a></p>
+{% endblock %}
+{% block body_end %}
+<script>
+  document.querySelectorAll('button.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.getAttribute('data-value'));
+      btn.textContent = 'Copied';
+      setTimeout(()=> btn.textContent='Copy', 1200);
+    });
+  });
+</script>
+{% endblock %}

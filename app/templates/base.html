@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}Azure AI Provisioner{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="branding">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM Logo" />
+      <span class="divider"></span>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft Logo" />
+      <h1>Azure AI Provisioner</h1>
+    </div>
+    <nav class="main-nav">
+      <a href="/">Home</a>
+      <button id="themeToggle" type="button" class="theme-toggle" aria-label="Toggle color theme">🌙 Dark</button>
+      {% block nav_extra %}{% endblock %}
+    </nav>
+  </header>
+  <main class="wrapper">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <p>Provisioning helper for Azure AI (OpenAI, Storage, optional Search, Foundry Project). This UI is for demo / enablement only – not production-hardened.</p>
+    <p style="margin-top:.5rem;">Built by <strong>Kiko de Ángel</strong> (<a href="mailto:frdeange@microsoft.com">frdeange@microsoft.com</a>)</p>
+  </footer>
+  <script>
+    (function(){
+      const root = document.documentElement;
+      const storageKey = 'aai-theme';
+      function apply(theme){ root.setAttribute('data-theme', theme); toggleBtn.textContent = theme === 'light' ? '🌙 Dark' : '☀️ Light'; }
+      const saved = localStorage.getItem(storageKey);
+      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+      const startTheme = saved || (prefersLight ? 'light' : 'dark');
+      root.setAttribute('data-theme', startTheme);
+      const toggleBtn = document.getElementById('themeToggle');
+      apply(startTheme);
+      toggleBtn.addEventListener('click', ()=>{
+        const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        apply(next);
+        localStorage.setItem(storageKey, next);
+      });
+    })();
+  </script>
+  {% block body_end %}{% endblock %}
+</body>
+</html>

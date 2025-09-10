@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Deployment Status · Azure AI Provisioner{% endblock %}
+{% block content %}
+<h2 style="margin-top:0;">Deployment Progress</h2>
+<div class="log-container">
+  <div class="status-bar">
+    <div id="status_chip" class="status-chip">{{ data.status }}</div>
+    <div style="font-size:.7rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-dim);">Live log stream</div>
+  </div>
+  <div id="log"></div>
+</div>
+<p class="notice">Browser will auto redirect to results once provisioning completes.</p>
+{% endblock %}
+{% block body_end %}
+<script>
+  const deploymentId = "{{ deployment_id }}";
+  const wsProto = (location.protocol === 'https:') ? 'wss' : 'ws';
+  const ws = new WebSocket(`${wsProto}://${location.host}/ws/${deploymentId}`);
+  const logDiv = document.getElementById('log');
+  const statusChip = document.getElementById('status_chip');
+  ws.onmessage = (e) => {
+    const atBottom = logDiv.scrollTop + logDiv.clientHeight >= logDiv.scrollHeight - 5;
+    logDiv.textContent += e.data + "\n";
+    if (atBottom) logDiv.scrollTop = logDiv.scrollHeight;
+    if (e.data.includes('Deployment completed successfully')) {
+      statusChip.textContent = 'completed';
+      statusChip.classList.add('ok');
+      setTimeout(()=> { window.location.href = `/results/${deploymentId}`; }, 1200);
+    }
+    if (e.data.startsWith('ERROR:')) {
+      statusChip.textContent = 'error';
+      statusChip.classList.remove('ok');
+      statusChip.classList.add('err');
+    }
+  };
+</script>
+{% endblock %}
