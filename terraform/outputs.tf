@@ -42,12 +42,6 @@ output "ai_services_name" {
 }
 
 output "ai_services_endpoint" {
-  value = try(azurerm_ai_services.aiservices.endpoint, null)
-}
-
-# Distinct endpoint outputs (provider currently exposes only the cognitive 'endpoint').
-# We derive conventional endpoint hostnames for clarity; if provider adds native attributes later replace derivations.
-output "ai_services_endpoint" {
   value       = try(azurerm_ai_services.aiservices.endpoint, null)
   description = "Primary Azure AI Services cognitive endpoint (.cognitiveservices.azure.com)."
 }
@@ -77,8 +71,9 @@ output "openai_model_name" {
 }
 
 output "search_service_endpoint" {
-  value = var.include_search ? azurerm_search_service.search[0].url : null
-  description = "Primary endpoint of Azure AI Search service (if created)."
+  # azurerm_search_service does not expose a 'url' attribute; endpoint is deterministic
+  value       = var.include_search ? "https://${azurerm_search_service.search[0].name}.search.windows.net" : null
+  description = "Primary endpoint of Azure AI Search service (derived)."
 }
 
 output "key_vault_name" {
