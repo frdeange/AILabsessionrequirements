@@ -107,6 +107,8 @@ async def start_deploy(
     openai_deployment_sku = "GlobalStandard"
     enable_model_deployment = True
     deployment_id = str(uuid.uuid4())
+    include_search_flag = str(include_search).lower() in {"on", "1", "true", "yes"}
+
     DEPLOYMENTS[deployment_id] = {
         "status": "starting",
         "logs": [],
@@ -115,7 +117,7 @@ async def start_deploy(
         "params": {
             "resource_group_base": base_clean,
             "location": location,
-            "include_search": include_search == "on",
+            "include_search": include_search_flag,
             "enable_model_deployment": enable_model_deployment,
             "openai_model_name": openai_model_name,
             "openai_model_version": openai_model_version,
@@ -298,7 +300,7 @@ async def run_full_deployment(deployment_id: str):
         tfvars_content = (
             f"rg_name = \"RG-{params['resource_group_base']}\"\n"
             f"location = \"{params['location']}\"\n"
-            f"include_search = {str(params['include_search']).lower()}\n"
+            f"include_search = {str(params['include_search']).lower()}\n"  # value from form; ensure checkbox sets 'on'
             f"storage_account_name = \"{names['storage_account_name']}\"\n"
             f"search_service_name = \"{names['search_service_name']}\"\n"
             f"foundry_project_name = \"{names['project_name']}\"\n"
@@ -317,16 +319,17 @@ async def run_full_deployment(deployment_id: str):
             tfvars_content += f"\nsubscription_id = \"{params['subscription_id']}\""
         tfvars_path = TERRAFORM_DIR / "terraform.tfvars"
         tfvars_path.write_text(tfvars_content, encoding="utf-8")
+        append_log(deployment_id, f"[DEBUG] include_search={params['include_search']} search_service_name={names['search_service_name']}")
 
         # Basic quota / usage precheck placeholder (future enhancement could call ARM usage APIs)
-        append_log(deployment_id, "[PRECHECK] Validando entorno (placeholder de cuotas).")
+        append_log(deployment_id, "[PRECHECK] Environment validation placeholder (quotas not yet checked).")
         try:
             acct = subprocess.check_output(["az", "account", "show", "-o", "json"]).decode()
             sub_info = json.loads(acct)
-            append_log(deployment_id, f"[PRECHECK] Subscription activa: {sub_info.get('id')} - {sub_info.get('name')}")
+            append_log(deployment_id, f"[PRECHECK] Active subscription: {sub_info.get('id')} - {sub_info.get('name')}")
         except Exception as e:  # noqa
-            append_log(deployment_id, f"[PRECHECK][WARN] No se pudo leer 'az account show': {e}")
-        append_log(deployment_id, "[PRECHECK] (Futuro) Consultar cuotas específicas de Cognitive, AI Foundry y almacenamiento.")
+            append_log(deployment_id, f"[PRECHECK][WARN] Could not read 'az account show': {e}")
+        append_log(deployment_id, "[PRECHECK] (Future) Query specific quotas for Cognitive, AI Foundry and Storage.")
 
         # Terraform init & apply
         await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=TERRAFORM_DIR)
@@ -336,6 +339,19 @@ async def run_full_deployment(deployment_id: str):
         outputs = json.loads(out_raw.decode())
         simplified = {k: v.get("value") for k, v in outputs.items()}
         DEPLOYMENTS[deployment_id]["outputs"].update(simplified)
+
+        # Standardize endpoint aliases (ensure three distinct endpoints if derivable)
+        ai_services_ep = simplified.get("ai_services_endpoint") or simplified.get("ai_services_endpoint")
+        openai_ep = simplified.get("openai_endpoint")
+        inference_ep = simplified.get("ai_inference_endpoint")
+        # Fallback derivations if terraform outputs missing (based on cognitive endpoint)
+        if ai_services_ep and not openai_ep and ".cognitiveservices.azure.com" in ai_services_ep:
+            openai_ep = ai_services_ep.replace(".cognitiveservices.azure.com", ".openai.azure.com")
+        if ai_services_ep and not inference_ep and ".cognitiveservices.azure.com" in ai_services_ep:
+            inference_ep = ai_services_ep.replace(".cognitiveservices.azure.com", ".services.ai.azure.com")
+        DEPLOYMENTS[deployment_id]["outputs"].setdefault("azure_ai_services_endpoint", ai_services_ep)
+        DEPLOYMENTS[deployment_id]["outputs"].setdefault("azure_openai_endpoint", openai_ep)
+        DEPLOYMENTS[deployment_id]["outputs"].setdefault("azure_ai_inference_endpoint", inference_ep)
 
         # Alias for foundry endpoint if present (user-friendly key)
         if simplified.get("foundry_project_endpoint"):
@@ -347,7 +363,33 @@ async def run_full_deployment(deployment_id: str):
 
         # Foundry project handled by Terraform
         DEPLOYMENTS[deployment_id]["status"] = "foundry"
-        rg_name = params['resource_group_base']
+
+        # Actual resource group name (prefixed in tfvars)
+        rg_name = f"RG-{params['resource_group_base']}"
+
+        # Retrieve Azure OpenAI (AI Services) keys & endpoint alias
+        try:
+            append_log(deployment_id, "Retrieving Azure OpenAI (AI Services) keys...")
+            ai_keys_raw = subprocess.check_output([
+                "az", "cognitiveservices", "account", "keys", "list",
+                "-n", names["ai_services_name"],
+                "-g", rg_name,
+                "-o", "json"
+            ])
+            ai_keys_json = json.loads(ai_keys_raw.decode())
+            if isinstance(ai_keys_json, dict):
+                DEPLOYMENTS[deployment_id]["outputs"].update({
+                    "azure_openai_endpoint": simplified.get("openai_endpoint") or simplified.get("ai_services_endpoint"),
+                    "azure_openai_api_key_primary": ai_keys_json.get("key1"),
+                    "azure_openai_api_key_secondary": ai_keys_json.get("key2"),
+                })
+            # Provide friendly alias for deployment name if present
+            if simplified.get("openai_deployment_name"):
+                DEPLOYMENTS[deployment_id]["outputs"].setdefault(
+                    "openai_model_deployment_name", simplified["openai_deployment_name"]
+                )
+        except Exception as e:  # noqa
+            append_log(deployment_id, f"[WARN] Could not fetch Azure OpenAI keys: {e}")
 
         # Retrieve Storage connection string & key
         try:
