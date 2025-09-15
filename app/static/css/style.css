@@ -70,16 +70,29 @@ footer.site-footer { text-align:center; font-size:.8rem; color:var(--text-dim); 
 
 form.provision-form { display:grid; gap:1.1rem; }
 form.provision-form label { font-size:.75rem; text-transform:uppercase; letter-spacing:.7px; font-weight:600; color:var(--text-dim); }
-form.provision-form input[type=text], form.provision-form select { background:#12161d; border:1px solid #2c343f; color:var(--text); padding:.7rem .8rem; border-radius:8px; font-size:.92rem; font-family:inherit; }
+form.provision-form input[type=text], form.provision-form input[type=date], form.provision-form select { background:#12161d; border:1px solid #2c343f; color:var(--text); padding:.7rem .8rem; border-radius:8px; font-size:.92rem; font-family:inherit; }
 [data-theme="light"] form.provision-form input[type=text],
+[data-theme="light"] form.provision-form input[type=date],
 [data-theme="light"] form.provision-form select { background:#f8fafc; border:1px solid #c9d4df; color:#1d2730; }
-[data-theme="light"] form.provision-form input[type=text]::placeholder { color:#7e8b97; }
+[data-theme="light"] form.provision-form input[type=text]::placeholder,
+[data-theme="light"] form.provision-form input[type=date]::placeholder { color:#7e8b97; }
 form.provision-form input:focus, form.provision-form select:focus { outline:2px solid var(--accent); outline-offset:1px; }
 form.provision-form .checkbox-inline { display:flex; align-items:center; gap:.55rem; font-size:.8rem; }
 
 /* Unified alignment & multi-column layout */
 form.provision-form > div { display:flex; flex-direction:column; gap:.45rem; }
-form.provision-form input[type=text], form.provision-form select { line-height:1.2; }
+form.provision-form input[type=text], form.provision-form input[type=date], form.provision-form select { line-height:1.2; }
+
+/* Date input specific styling */
+form.provision-form input[type=date]::-webkit-calendar-picker-indicator {
+  background-color: var(--text-dim);
+  border-radius: 3px;
+  cursor: pointer;
+}
+[data-theme="light"] form.provision-form input[type=date]::-webkit-calendar-picker-indicator {
+  background-color: #7e8b97;
+}
+
 @media (min-width:980px){
   form.provision-form { grid-template-columns:repeat(2,minmax(260px,1fr)); }
   form.provision-form .checkbox-inline, form.provision-form > div:nth-last-child(2), form.provision-form > div:last-child { grid-column:1/-1; }

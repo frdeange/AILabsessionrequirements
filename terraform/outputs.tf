@@ -126,3 +126,15 @@ output "hub_principal_id" {
 output "ai_foundry_project_principal_id" {
   value = try(azapi_resource.ai_foundry_project.output.identity.principalId, null)
 }
+
+# Service Principal outputs
+output "service_principal_app_id" {
+  value       = azuread_application.workshop_app.client_id
+  description = "Application (client) ID of the Service Principal"
+}
+
+output "service_principal_secret" {
+  value       = azuread_application_password.workshop_secret.value
+  sensitive   = true
+  description = "Secret value for the Service Principal"
+}

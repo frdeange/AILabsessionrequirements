@@ -70,6 +70,24 @@
         <td><button class="copy-btn" data-value="{{ data.outputs.app_insights_connection_string }}">Copy</button></td>
       </tr>
       {% endif %}
+      
+      <!-- Service Principal App ID -->
+      {% if data.outputs.service_principal_app_id %}
+      <tr>
+        <td class="key">Service Principal App ID</td>
+        <td class="value">{{ data.outputs.service_principal_app_id }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.service_principal_app_id }}">Copy</button></td>
+      </tr>
+      {% endif %}
+      
+      <!-- Service Principal Secret -->
+      {% if data.outputs.service_principal_secret %}
+      <tr>
+        <td class="key">Service Principal Secret</td>
+        <td class="value secret">{{ data.outputs.service_principal_secret }}</td>
+        <td><button class="copy-btn" data-value="{{ data.outputs.service_principal_secret }}">Copy</button></td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -81,7 +99,7 @@
     <thead><tr><th>Key</th><th>Value</th><th>Copy</th></tr></thead>
     <tbody>
       {% for k, v in data.outputs.items() %}
-        {% if k not in ['openai_endpoint', 'azure_openai_key', 'openai_deployment_name', 'azure_foundry_project_url', 'search_service_endpoint', 'azure_search_admin_key', 'app_insights_connection_string'] %}
+        {% if k not in ['openai_endpoint', 'azure_openai_key', 'openai_deployment_name', 'azure_foundry_project_url', 'search_service_endpoint', 'azure_search_admin_key', 'app_insights_connection_string', 'service_principal_app_id', 'service_principal_secret'] %}
         <tr>
           <td class="key">{{ k }}</td>
           <td class="value {% if 'key' in k or 'connection_string' in k %}secret{% endif %}">{{ v }}</td>

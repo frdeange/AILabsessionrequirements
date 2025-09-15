@@ -87,3 +87,14 @@ variable "assign_storage_rbac" {
   description = "Si true asigna roles RBAC (Blob Data) a identidades (Hub y AI Services)."
   default     = true
 }
+
+# --- Service Principal variables ---
+variable "service_principal_name" {
+  type        = string
+  description = "Name for the Azure AD Service Principal to be created."
+}
+
+variable "secret_expiration_date" {
+  type        = string
+  description = "Expiration date for the Service Principal secret in YYYY-MM-DD format."
+}

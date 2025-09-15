@@ -282,3 +282,57 @@ resource "azurerm_role_assignment" "search_service_contributor_ai_foundry_projec
   role_definition_name = "Search Service Contributor"
   principal_id         = azapi_resource.ai_foundry_project.output.identity.principalId
 }
+
+###############################################
+# Service Principal for workshops
+###############################################
+
+# Create Azure AD Application
+resource "azuread_application" "workshop_app" {
+  display_name = var.service_principal_name
+  description  = "Service Principal for Azure AI workshop exercises"
+}
+
+# Create Service Principal
+resource "azuread_service_principal" "workshop_sp" {
+  client_id = azuread_application.workshop_app.client_id
+  app_role_assignment_required = false
+  description = "Service Principal for Azure AI workshop exercises"
+}
+
+# Create Application Password (Secret)
+resource "azuread_application_password" "workshop_secret" {
+  application_id = azuread_application.workshop_app.id
+  display_name   = "Workshop Secret"
+  end_date       = "${var.secret_expiration_date}T23:59:59Z"
+}
+
+# Role assignment: Azure AI Project Manager
+resource "azurerm_role_assignment" "sp_ai_project_manager" {
+  depends_on = [
+    azapi_resource.hub
+  ]
+  scope                = azapi_resource.hub.id
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b78c784d-1c93-4b78-8810-3c7f7bb8f11f"
+  principal_id         = azuread_service_principal.workshop_sp.object_id
+}
+
+# Role assignment: Azure AI User
+resource "azurerm_role_assignment" "sp_ai_user" {
+  depends_on = [
+    azapi_resource.hub
+  ]
+  scope                = azapi_resource.hub.id
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/1415e2d3-7a32-4b93-b4d1-bb3eb63b5c5b"
+  principal_id         = azuread_service_principal.workshop_sp.object_id
+}
+
+# Role assignment: Cognitive Services Data Contributor
+resource "azurerm_role_assignment" "sp_cognitive_services_data_contributor" {
+  depends_on = [
+    azapi_resource.hub
+  ]
+  scope                = azapi_resource.hub.id
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68"
+  principal_id         = azuread_service_principal.workshop_sp.object_id
+}

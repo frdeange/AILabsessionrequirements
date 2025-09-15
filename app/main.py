@@ -89,6 +89,8 @@ async def start_deploy(
     include_search: Optional[str] = Form(None),
     openai_model_name: str = Form("gpt-4.1"),
     subscription_id: Optional[str] = Form(None),
+    service_principal_name: str = Form(...),
+    secret_expiration_date: str = Form(...),
 ):
     base_clean = sanitize_base(resource_group_base)
     if len(base_clean) < 3:
@@ -125,6 +127,8 @@ async def start_deploy(
             "model_deployment_name": model_deployment_name,
             # fallback to environment AZ_SUBSCRIPTION_ID if form empty
             "subscription_id": ((subscription_id or "").strip() or os.getenv("AZ_SUBSCRIPTION_ID", "").strip()),
+            "service_principal_name": service_principal_name.strip(),
+            "secret_expiration_date": secret_expiration_date.strip(),
         },
     }
     asyncio.create_task(run_full_deployment(deployment_id))
@@ -312,7 +316,9 @@ async def run_full_deployment(deployment_id: str):
             f"model_deployment_name = \"{params['model_deployment_name']}\"\n"
             f"openai_model_name = \"{params['openai_model_name']}\"\n"
             f"openai_model_version = \"{params['openai_model_version']}\"\n"
-            f"openai_deployment_sku = \"{params['openai_deployment_sku']}\""
+            f"openai_deployment_sku = \"{params['openai_deployment_sku']}\"\n"
+            f"service_principal_name = \"{params['service_principal_name']}\"\n"
+            f"secret_expiration_date = \"{params['secret_expiration_date']}\""
         )
         if params.get("subscription_id"):
             tfvars_content += f"\nsubscription_id = \"{params['subscription_id']}\""
