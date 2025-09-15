@@ -177,22 +177,51 @@ def append_log(deployment_id: str, line: str):
     DEPLOYMENTS[deployment_id]["logs"].append(line)
 
 
-async def run_cmd_stream(deployment_id: str, cmd: list, cwd: Path | None = None, env: Dict[str, str] | None = None):
+async def run_cmd_stream(deployment_id: str, cmd: list, cwd: Path | None = None, env: Dict[str, str] | None = None, max_retries: int = 0, retry_delay: int = 30):
     append_log(deployment_id, f"[CMD] {' '.join(cmd)}")
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=str(cwd) if cwd else None,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        env=env or os.environ.copy(),
-    )
-    assert process.stdout
-    async for line in process.stdout:  # type: ignore
-        append_log(deployment_id, line.decode(errors='ignore').rstrip())
-    rc = await process.wait()
-    append_log(deployment_id, f"[EXIT {rc}] {' '.join(cmd)}")
-    if rc != 0:
-        raise RuntimeError(f"Command failed: {' '.join(cmd)}")
+    
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            append_log(deployment_id, f"[RETRY] Attempt {attempt + 1}/{max_retries + 1} after {retry_delay}s delay")
+            await asyncio.sleep(retry_delay)
+            
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(cwd) if cwd else None,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env or os.environ.copy(),
+        )
+        assert process.stdout
+        
+        output_lines = []
+        async for line in process.stdout:  # type: ignore
+            line_text = line.decode(errors='ignore').rstrip()
+            append_log(deployment_id, line_text)
+            output_lines.append(line_text)
+            
+        rc = await process.wait()
+        append_log(deployment_id, f"[EXIT {rc}] {' '.join(cmd)}")
+        
+        if rc == 0:
+            return  # Success
+            
+        # Check if it's a retryable error (409 Conflict)
+        output_text = '\n'.join(output_lines)
+        is_retryable = (
+            attempt < max_retries and 
+            "terraform apply" in ' '.join(cmd) and
+            ("409" in output_text or "Conflict" in output_text or "provisioning state is not terminal" in output_text)
+        )
+        
+        if is_retryable:
+            append_log(deployment_id, f"[RETRY] Detected retryable error (409 Conflict). Will retry in {retry_delay}s...")
+            continue
+        else:
+            # Not retryable or max retries exceeded
+            raise RuntimeError(f"Command failed: {' '.join(cmd)}")
+    
+    raise RuntimeError(f"Command failed after {max_retries + 1} attempts: {' '.join(cmd)}")
 
 
 def azure_logged_in() -> bool:
@@ -338,7 +367,7 @@ async def run_full_deployment(deployment_id: str):
 
         # Terraform init & apply
         await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=TERRAFORM_DIR)
-        await run_cmd_stream(deployment_id, ["terraform", "apply", "-auto-approve"], cwd=TERRAFORM_DIR)
+        await run_cmd_stream(deployment_id, ["terraform", "apply", "-auto-approve"], cwd=TERRAFORM_DIR, max_retries=2, retry_delay=60)
         # Terraform outputs
         out_raw = subprocess.check_output(["terraform", "output", "-json"], cwd=str(TERRAFORM_DIR))
         outputs = json.loads(out_raw.decode())

@@ -287,6 +287,15 @@ resource "azurerm_role_assignment" "search_service_contributor_ai_foundry_projec
 # Service Principal for workshops
 ###############################################
 
+# Additional wait time for Service Principal operations
+resource "time_sleep" "wait_for_hub_stability" {
+  depends_on = [
+    azapi_resource.hub,
+    time_sleep.wait_project_identities
+  ]
+  create_duration = "60s"
+}
+
 # Create Azure AD Application
 resource "azuread_application" "workshop_app" {
   display_name = var.service_principal_name
@@ -310,29 +319,32 @@ resource "azuread_application_password" "workshop_secret" {
 # Role assignment: Azure AI Project Manager
 resource "azurerm_role_assignment" "sp_ai_project_manager" {
   depends_on = [
-    azapi_resource.hub
+    azapi_resource.hub,
+    time_sleep.wait_for_hub_stability
   ]
   scope                = azapi_resource.hub.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b78c784d-1c93-4b78-8810-3c7f7bb8f11f"
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/eadc314b-1a2d-4efa-be10-5d325db5065e"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 
 # Role assignment: Azure AI User
 resource "azurerm_role_assignment" "sp_ai_user" {
   depends_on = [
-    azapi_resource.hub
+    azapi_resource.hub,
+    time_sleep.wait_for_hub_stability
   ]
   scope                = azapi_resource.hub.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/1415e2d3-7a32-4b93-b4d1-bb3eb63b5c5b"
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 
-# Role assignment: Cognitive Services Data Contributor
+# Role assignment: Cognitive Services Data Contributor (Preview)
 resource "azurerm_role_assignment" "sp_cognitive_services_data_contributor" {
   depends_on = [
-    azapi_resource.hub
+    azapi_resource.hub,
+    time_sleep.wait_for_hub_stability
   ]
   scope                = azapi_resource.hub.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68"
+  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/19c28022-e58e-450d-a464-0b2a53034789"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
