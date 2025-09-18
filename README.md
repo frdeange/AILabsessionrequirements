@@ -33,6 +33,28 @@ This project provides a **beautiful web interface** that lets you deploy a compl
 
 ---
 
+## 📸 Screenshots
+
+### 1. 📝 **Deployment Form**
+*Simple, intuitive form to configure your Azure AI environment*
+
+![Deployment Form](./docs/images/deployment-form.png)
+> Configure resource names, select Azure region, choose AI models, and set Service Principal details
+
+### 2. ⚡ **Real-time Deployment Progress**
+*Watch your infrastructure come to life with live Terraform logs*
+
+![Live Deployment Logs](./docs/images/deployment-progress.png)
+> Real-time streaming of Terraform execution with WebSocket updates
+
+### 3. 🎯 **Results & Credentials**
+*Everything you need for your AI workloads, organized and ready to copy*
+
+![Deployment Results](./docs/images/deployment-results.png)
+> Complete credentials summary with Service Principal details, endpoints, and keys
+
+---
+
 ## ✨ Key Features
 
 ### 🎨 **Beautiful UI Experience**
