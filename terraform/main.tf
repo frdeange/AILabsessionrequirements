@@ -123,7 +123,7 @@ resource "azurerm_cognitive_deployment" "model" {
 
   sku {
     name     = var.openai_deployment_sku
-    capacity = 1
+    capacity = 500
   }
 
   model {

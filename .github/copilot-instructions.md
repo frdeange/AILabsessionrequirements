@@ -5,6 +5,7 @@ FastAPI web app + Terraform to provision Azure AI resources (AI Services, Foundr
 
 ## Language restrictions
 In the code, all messages, comments, log output, and variable names must be in English.
+Also you have to describe the commit messages in English.
 
 ## Key Directories / Files
 - `app/main.py`: FastAPI app, form handling, Azure CLI subscription detection, name building, tfvars generation, WebSocket log streaming.
