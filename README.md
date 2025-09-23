@@ -17,7 +17,9 @@
 
 ## 🎯 What Does This Do?
 
-This project provides a **beautiful web interface** that lets you deploy a complete Azure AI infrastructure stack with just a few clicks. Watch your infrastructure come to life with **real-time streaming logs** as Terraform provisions everything you need for AI/ML workloads.
+This project provides a **beautiful web interface** that lets you deploy and manage multiple Azure AI infrastructure stacks with just a few clicks. Watch your infrastructure come to life with **real-time streaming logs** as Terraform provisions everything you need for AI/ML workloads.
+
+**New: Multi-Environment Manager** - Create, monitor, and destroy multiple Azure AI environments from a centralized dashboard, with persistent state management and easy credential export.
 
 ### 🏗️ What Gets Deployed
 
@@ -53,6 +55,12 @@ This project provides a **beautiful web interface** that lets you deploy a compl
 ![Deployment Results](./docs/images/deployment-results.png)
 > Complete credentials summary with Service Principal details, endpoints, and keys
 
+### 4. 📊 **Multi-Environment Dashboard**
+*Manage all your Azure AI environments from one central location*
+
+![Multi-Environment Dashboard](./docs/images/dashboard.png)
+> View, manage, and destroy multiple deployments with persistent state tracking
+
 ---
 
 ## ✨ Key Features
@@ -60,9 +68,18 @@ This project provides a **beautiful web interface** that lets you deploy a compl
 ### 🎨 **Beautiful UI Experience**
 - 🌐 Clean, modern web interface
 - ⏱️ Real-time progress tracking with streaming logs
-- 📋 Organized results with "Required for Exercises" section
+- � **Multi-environment dashboard** - Manage multiple deployments
+- �📋 Organized results with "Required for Exercises" section
 - 📋 One-click copy for all endpoints and keys
 - 🔄 Live WebSocket updates during deployment
+- 📄 **Download .env files** - Export ready-to-use environment configurations
+
+### 🎯 **Multi-Environment Management**
+- 🗂️ **Persistent state** - Deployments survive container restarts
+- 🎛️ **Dashboard overview** - See all environments at a glance
+- 🗑️ **Safe destroy** - Clean up resources with confirmation dialogs
+- 📈 **Status tracking** - Monitor deployment progress and health
+- 🔄 **Live operations** - Real-time logs for create and destroy operations
 
 ### 🔒 **Enterprise Security**
 - 🚫 **Zero shared keys** - Everything uses Azure AD authentication
@@ -84,7 +101,8 @@ Get everything you need for AI development:
 - ✅ Search service endpoints and keys
 - ✅ Application Insights connection strings
 - ✅ Model deployment names
-- ✅ All organized for immediate use
+- ✅ **One-click .env download** - All credentials in ready-to-use format
+- ✅ All organized for immediate use in your projects
 
 ---
 
@@ -165,8 +183,18 @@ Everything you need to start coding:
 ✅ App Insights Connection: [connection string]
 ```
 
-#### 📊 **Additional Details**
+#### � **Download .env File**
+Click the **"Download .env file"** button to get all credentials in a ready-to-use environment file format - perfect for importing into your projects!
+
+#### �📊 **Additional Details**
 All other resource information for advanced scenarios.
+
+### 4. **Manage Multiple Environments** 🗂️
+- Visit `/deployments` to see your **Multi-Environment Dashboard**
+- View all deployments, their status, and available actions
+- **Destroy environments** safely when no longer needed
+- **Download .env files** from any completed deployment
+- Track deployment history and resource usage
 
 ---
 
@@ -181,6 +209,24 @@ All other resource information for advanced scenarios.
 📋 Terraform Configuration
     ↓ (WebSocket streaming)
 ☁️ Azure Resources
+    ↓ (State persistence)
+🗂️ Multi-Environment Dashboard
+```
+
+### Multi-Environment Architecture
+```
+📊 Dashboard (/deployments)
+    ├── 🗂️ Deployment List
+    ├── 📈 Status Tracking  
+    ├── 🗑️ Destroy Actions
+    └── 📄 .env Downloads
+    
+💾 Persistent Storage
+    ├── deployments.json (database)
+    └── {deployment-id}/
+        ├── terraform.tfstate
+        ├── terraform.tfvars
+        └── metadata.json
 ```
 
 ### Key Design Decisions
@@ -279,6 +325,11 @@ az account show
 ## 🧪 What's New in This Version
 
 ### 🆕 Recent Updates
+- ✅ **Multi-Environment Manager** - Dashboard to manage multiple deployments
+- ✅ **Persistent State** - Deployments survive container restarts 
+- ✅ **Destroy Functionality** - Safe resource cleanup with live streaming
+- ✅ **Download .env Files** - Export credentials in ready-to-use format
+- ✅ **Enhanced Dashboard** - Status tracking and deployment management
 - ✅ **Fixed AI Foundry Project URLs** - Now extracts real API endpoints
 - ✅ **Enhanced Results UI** - Organized sections for better UX
 - ✅ **Improved Security** - Full AAD authentication, no shared keys

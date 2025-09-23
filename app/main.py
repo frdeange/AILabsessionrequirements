@@ -5,12 +5,13 @@ import random
 import string
 import subprocess
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -18,14 +19,144 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 TERRAFORM_DIR = BASE_DIR / "terraform"
+DEPLOYMENT_STATES_DIR = BASE_DIR / "deployment_states"
+DEPLOYMENTS_DB_FILE = DEPLOYMENT_STATES_DIR / "deployments.json"
 
 app = FastAPI(title="Azure AI Provisioner")
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
-# In-memory store for deployments
+# In-memory store for deployments (legacy - will be replaced by persistent storage)
 DEPLOYMENTS: Dict[str, Dict] = {}
+
+@app.on_event("startup")
+async def startup_event():
+    """Load persisted deployments on startup"""
+    global DEPLOYMENTS
+    persisted_deployments = load_all_deployments()
+    DEPLOYMENTS.update(persisted_deployments)
+    print(f"Loaded {len(persisted_deployments)} persisted deployments")
+
+###############################################
+# Deployment Persistence Functions
+###############################################
+
+def load_deployments_db() -> Dict:
+    """Load deployments database from persistent storage"""
+    try:
+        if DEPLOYMENTS_DB_FILE.exists():
+            with open(DEPLOYMENTS_DB_FILE, 'r') as f:
+                return json.load(f)
+        else:
+            # Create initial structure
+            initial_db = {
+                "deployments": {},
+                "metadata": {
+                    "version": "1.0", 
+                    "created": "2025-09-23T09:50:00Z",
+                    "description": "Multi-Environment Manager - Deployment Database"
+                }
+            }
+            save_deployments_db(initial_db)
+            return initial_db
+    except Exception as e:
+        print(f"Error loading deployments database: {e}")
+        return {"deployments": {}, "metadata": {}}
+
+def save_deployments_db(db: Dict) -> None:
+    """Save deployments database to persistent storage"""
+    try:
+        DEPLOYMENT_STATES_DIR.mkdir(exist_ok=True)
+        with open(DEPLOYMENTS_DB_FILE, 'w') as f:
+            json.dump(db, f, indent=2)
+    except Exception as e:
+        print(f"Error saving deployments database: {e}")
+
+def save_deployment_state(deployment_id: str, deployment_data: Dict, outputs: Dict = None) -> None:
+    """Save deployment state and metadata persistently"""
+    try:
+        # Create deployment directory
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        deployment_dir.mkdir(exist_ok=True)
+        
+        # Save terraform state if exists
+        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
+        if terraform_state.exists():
+            import shutil
+            shutil.copy(terraform_state, deployment_dir / "terraform.tfstate")
+        
+        # Save terraform tfvars if exists
+        terraform_tfvars = TERRAFORM_DIR / "terraform.tfvars"
+        if terraform_tfvars.exists():
+            import shutil
+            shutil.copy(terraform_tfvars, deployment_dir / "terraform.tfvars")
+        
+        # Save deployment metadata
+        metadata = {
+            "deployment_id": deployment_id,
+            "deployment_data": deployment_data,
+            "outputs": outputs or {},
+            "saved_at": "2025-09-23T09:50:00Z",
+            "has_state": terraform_state.exists(),
+            "status": deployment_data.get("status", "unknown")
+        }
+        
+        with open(deployment_dir / "metadata.json", 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        # Update main database
+        db = load_deployments_db()
+        db["deployments"][deployment_id] = {
+            "id": deployment_id,
+            "name": deployment_data.get("params", {}).get("resource_group_base", "Unknown"),
+            "status": deployment_data.get("status", "unknown"),
+            "created_at": "2025-09-23T09:50:00Z",
+            "has_state": terraform_state.exists(),
+            "outputs_available": bool(outputs),
+            "region": deployment_data.get("params", {}).get("location", "unknown"),
+            "include_search": deployment_data.get("params", {}).get("include_search", False),
+            "resource_names": deployment_data.get("names", {})
+        }
+        save_deployments_db(db)
+        
+    except Exception as e:
+        print(f"Error saving deployment state for {deployment_id}: {e}")
+
+def load_deployment_state(deployment_id: str) -> Dict:
+    """Load deployment state from persistent storage"""
+    try:
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        if not deployment_dir.exists():
+            return {}
+        
+        metadata_file = deployment_dir / "metadata.json"
+        if metadata_file.exists():
+            with open(metadata_file, 'r') as f:
+                return json.load(f)
+        return {}
+    except Exception as e:
+        print(f"Error loading deployment state for {deployment_id}: {e}")
+        return {}
+
+def get_all_deployments() -> Dict:
+    """Get list of all deployments from database"""
+    db = load_deployments_db()
+    return db.get("deployments", {})
+
+def load_all_deployments() -> Dict[str, Dict]:
+    """Load all deployments with full state from persistent storage"""
+    deployments = {}
+    try:
+        db = load_deployments_db()
+        for deployment_id in db.get("deployments", {}):
+            metadata = load_deployment_state(deployment_id)
+            if metadata and "deployment_data" in metadata:
+                deployments[deployment_id] = metadata["deployment_data"]
+        return deployments
+    except Exception as e:
+        print(f"Error loading all deployments: {e}")
+        return {}
 
 # Simple naming utility respecting some Azure limits
 # Storage account: 3-24 lower case letters/numbers only
@@ -77,6 +208,23 @@ def build_names(base: str) -> Dict[str, str]:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/deployments", response_class=HTMLResponse)
+async def deployments_dashboard(request: Request):
+    """Dashboard showing all deployments with management options"""
+    try:
+        deployments = get_all_deployments()
+        return templates.TemplateResponse("deployments.html", {
+            "request": request, 
+            "deployments": deployments
+        })
+    except Exception as e:
+        return templates.TemplateResponse("deployments.html", {
+            "request": request, 
+            "deployments": {},
+            "error": f"Error loading deployments: {e}"
+        })
 
 
 ALLOWED_MODEL_NAMES = {"gpt-4.1","gpt-4.1-mini","gpt-4o","gpt-4o-mini"}
@@ -135,6 +283,29 @@ async def start_deploy(
     return RedirectResponse(url=f"/deployment/{deployment_id}", status_code=302)
 
 
+@app.post("/destroy/{deployment_id}")
+async def start_destroy(deployment_id: str, request: Request):
+    """Start the destroy process for a deployment"""
+    data = DEPLOYMENTS.get(deployment_id)
+    if not data:
+        return JSONResponse({"error": "Deployment not found"}, status_code=404)
+    
+    # Check if deployment has terraform state
+    deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+    state_file = deployment_dir / "terraform.tfstate"
+    if not state_file.exists():
+        return JSONResponse({"error": "No terraform state found for this deployment"}, status_code=400)
+    
+    # Update status to destroying
+    DEPLOYMENTS[deployment_id]["status"] = "destroying"
+    DEPLOYMENTS[deployment_id]["logs"] = []  # Clear old logs
+    save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+    
+    # Start destroy task
+    asyncio.create_task(run_full_destroy(deployment_id))
+    return JSONResponse({"success": True, "redirect": f"/deployment/{deployment_id}"})
+
+
 @app.get("/deployment/{deployment_id}", response_class=HTMLResponse)
 async def deployment_status(deployment_id: str, request: Request):
     data = DEPLOYMENTS.get(deployment_id)
@@ -151,6 +322,98 @@ async def deployment_results(deployment_id: str, request: Request):
     if data.get("status") != "completed":
         return RedirectResponse(url=f"/deployment/{deployment_id}")
     return templates.TemplateResponse("results.html", {"request": request, "deployment_id": deployment_id, "data": data})
+
+
+@app.get("/download-env/{deployment_id}")
+async def download_env_file(deployment_id: str):
+    """Generate and download a .env file with all deployment outputs"""
+    data = DEPLOYMENTS.get(deployment_id)
+    if not data:
+        return JSONResponse({"error": "Deployment not found"}, status_code=404)
+    
+    outputs = data.get("outputs", {})
+    if not outputs:
+        return JSONResponse({"error": "No outputs available for this deployment"}, status_code=400)
+    
+    # Generate .env content matching IBM Masterclass format
+    env_content = "# =============================================================================\n"
+    env_content += "# IBM Masterclass Day 1 - Environment Configuration\n"
+    env_content += "# =============================================================================\n"
+    env_content += f"# Generated from Azure AI deployment: {deployment_id[:8]}\n"
+    env_content += f"# Created at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+    env_content += "# Never commit .env files with real credentials to version control!\n\n"
+    
+    # Azure Subscription & Service Principal
+    env_content += "# =============================================================================\n"
+    env_content += "# Azure Subscription & Service Principal\n"
+    env_content += "# =============================================================================\n"
+    if outputs.get("subscription_id"):
+        env_content += f'AZURE_SUBSCRIPTION_ID="{outputs["subscription_id"]}"\n'
+    elif data.get("params", {}).get("subscription_id"):
+        env_content += f'AZURE_SUBSCRIPTION_ID="{data["params"]["subscription_id"]}"\n'
+    if outputs.get("tenant_id"):
+        env_content += f'AZURE_TENANT_ID="{outputs["tenant_id"]}"\n'
+    if outputs.get("service_principal_app_id"):
+        env_content += f'AZURE_CLIENT_ID="{outputs["service_principal_app_id"]}"\n'
+    if outputs.get("service_principal_secret"):
+        env_content += f'AZURE_CLIENT_SECRET="{outputs["service_principal_secret"]}"\n'
+    
+    # Azure OpenAI Configuration
+    env_content += "\n# =============================================================================\n"
+    env_content += "# Azure OpenAI Configuration (EX1, EX3, EX4, EX5, EX6)\n"
+    env_content += "# =============================================================================\n"
+    if outputs.get("openai_endpoint"):
+        env_content += f'AZURE_OPENAI_ENDPOINT="{outputs["openai_endpoint"]}"\n'
+    if outputs.get("azure_openai_key"):
+        env_content += f'AZURE_OPENAI_API_KEY="{outputs["azure_openai_key"]}"\n'
+    if outputs.get("openai_deployment_name"):
+        env_content += f'AZURE_OPENAI_DEPLOYMENT_NAME="{outputs["openai_deployment_name"]}"\n'
+    # Fixed values from the workshop
+    env_content += 'AZURE_OPENAI_API_VERSION="2024-12-01-preview"\n'
+    env_content += 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"\n'
+    
+    # Azure AI Foundry / AI Studio
+    env_content += "\n# =============================================================================\n"
+    env_content += "# Azure AI Foundry / AI Studio (EX2, EX4, EX5, EX6)\n"
+    env_content += "# =============================================================================\n"
+    # Use AI inference endpoint for Foundry (different from project URL)
+    if outputs.get("ai_inference_endpoint"):
+        env_content += f'AI_FOUNDRY_ENDPOINT="{outputs["ai_inference_endpoint"]}"\n'
+    elif outputs.get("azure_foundry_project_url"):
+        # Fallback to project URL if inference endpoint not available
+        env_content += f'AI_FOUNDRY_ENDPOINT="{outputs["azure_foundry_project_url"]}"\n'
+    # Same key as OpenAI
+    if outputs.get("azure_openai_key"):
+        env_content += f'AI_FOUNDRY_API_KEY="{outputs["azure_openai_key"]}"\n'
+    # Same deployment name as OpenAI
+    if outputs.get("openai_deployment_name"):
+        env_content += f'AI_FOUNDRY_DEPLOYMENT_NAME="{outputs["openai_deployment_name"]}"\n'
+    
+    # Azure AI Search Configuration
+    env_content += "\n# =============================================================================\n"
+    env_content += "# Azure AI Search Configuration (EX3)\n"
+    env_content += "# =============================================================================\n"
+    if outputs.get("search_service_endpoint"):
+        env_content += f'AZURE_SEARCH_ENDPOINT="{outputs["search_service_endpoint"]}"\n'
+    if outputs.get("azure_search_admin_key"):
+        env_content += f'AZURE_SEARCH_API_KEY="{outputs["azure_search_admin_key"]}"\n'
+    # Fixed index name from workshop
+    env_content += 'AZURE_SEARCH_INDEX_NAME="masterclass-index"\n'
+    
+    # Logging and Monitoring
+    env_content += "\n# =============================================================================\n"
+    env_content += "# Logging and Monitoring (Optional)\n"
+    env_content += "# =============================================================================\n"
+    env_content += 'LOG_LEVEL="INFO"\n'
+    if outputs.get("app_insights_connection_string"):
+        env_content += f'APPLICATION_INSIGHTS_CONNECTION_STRING="{outputs["app_insights_connection_string"]}"\n'
+    
+    # Return as downloadable file
+    return Response(
+        content=env_content,
+        media_type="text/plain",
+        headers={"Content-Disposition": f"attachment; filename=azure-ai-{deployment_id[:8]}.env"}
+    )
 
 
 @app.websocket("/ws/{deployment_id}")
@@ -327,6 +590,8 @@ async def run_full_deployment(deployment_id: str):
     params = data["params"]
     try:
         DEPLOYMENTS[deployment_id]["status"] = "terraform"
+        # Save initial deployment state persistently
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
         # Ensure Azure login first (before terraform so provider auth works)
         await ensure_azure_login(deployment_id)
         # Prepare terraform.tfvars
@@ -475,9 +740,88 @@ async def run_full_deployment(deployment_id: str):
 
         DEPLOYMENTS[deployment_id]["status"] = "completed"
         append_log(deployment_id, "Deployment completed successfully")
+        # Save deployment state persistently
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
     except Exception as e:  # noqa
         DEPLOYMENTS[deployment_id]["status"] = "error"
         append_log(deployment_id, f"ERROR: {e}")
+        # Save deployment state even on error
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+
+
+async def run_full_destroy(deployment_id: str):
+    """Execute terraform destroy for a deployment"""
+    data = DEPLOYMENTS[deployment_id]
+    try:
+        DEPLOYMENTS[deployment_id]["status"] = "destroying"
+        # Save initial destroy state persistently
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+        
+        # Ensure Azure login first
+        await ensure_azure_login(deployment_id)
+        
+        # Copy state file back to terraform directory
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        state_file = deployment_dir / "terraform.tfstate"
+        tfvars_file = deployment_dir / "terraform.tfvars"
+        
+        # Copy terraform state and tfvars back to terraform directory
+        if state_file.exists():
+            import shutil
+            shutil.copy(state_file, TERRAFORM_DIR / "terraform.tfstate")
+            append_log(deployment_id, "Copied terraform state for destroy operation")
+        
+        if tfvars_file.exists():
+            import shutil
+            shutil.copy(tfvars_file, TERRAFORM_DIR / "terraform.tfvars")
+            append_log(deployment_id, "Copied terraform tfvars for destroy operation")
+        
+        # Run terraform destroy
+        append_log(deployment_id, "Starting terraform destroy...")
+        destroy_process = await asyncio.create_subprocess_exec(
+            "terraform", "destroy", "-auto-approve",
+            cwd=TERRAFORM_DIR,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=dict(os.environ, **{"TF_LOG": "INFO"})
+        )
+        
+        # Stream destroy output
+        while True:
+            line = await destroy_process.stdout.readline()
+            if not line:
+                break
+            line_str = line.decode("utf-8", errors="ignore").strip()
+            if line_str:
+                append_log(deployment_id, line_str)
+        
+        await destroy_process.wait()
+        
+        if destroy_process.returncode == 0:
+            DEPLOYMENTS[deployment_id]["status"] = "destroyed"
+            append_log(deployment_id, "Resources destroyed successfully")
+            
+            # Clean up state files after successful destroy
+            terraform_state = TERRAFORM_DIR / "terraform.tfstate"
+            if terraform_state.exists():
+                terraform_state.unlink()
+                append_log(deployment_id, "Cleaned up terraform state file")
+            
+            # Remove outputs since resources no longer exist
+            DEPLOYMENTS[deployment_id]["outputs"] = {}
+            
+        else:
+            DEPLOYMENTS[deployment_id]["status"] = "destroy_error"
+            append_log(deployment_id, f"Terraform destroy failed with exit code {destroy_process.returncode}")
+        
+        # Save final deployment state persistently
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+        
+    except Exception as e:  # noqa
+        DEPLOYMENTS[deployment_id]["status"] = "destroy_error"
+        append_log(deployment_id, f"ERROR during destroy: {e}")
+        # Save deployment state even on error
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
 
 
 if __name__ == "__main__":

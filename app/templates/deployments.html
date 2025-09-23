@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block title %}Deployments Dashboard · Azure AI Provisioner{% endblock %}
+{% block content %}
+
+<div class="hero-head">
+  <h2>Deployments Dashboard</h2>
+  <p class="tagline">Manage all your Azure AI environments from one place.</p>
+</div>
+
+{% if error %}
+  <div class="error-box">{{ error }}</div>
+{% endif %}
+
+<div class="dashboard-actions" style="margin: 1.5rem 0;">
+  <a href="/" class="primary" style="text-decoration: none; padding: 0.6rem 1.2rem; border-radius: 8px; background: var(--gradient); color: white; font-weight: 600; font-size: 0.9rem;">+ New Deployment</a>
+  <span style="color: var(--text-dim); font-size: 0.8rem; margin-left: 1rem;">{{ deployments|length }} deployment(s) total</span>
+</div>
+
+{% if deployments %}
+<div class="deployments-grid">
+  <div class="deployments-table-wrapper">
+    <table class="deployments-table">
+      <thead>
+        <tr>
+          <th>Environment Name</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Region</th>
+          <th>Resources</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for deployment_id, deployment in deployments.items() %}
+        <tr>
+          <td class="deployment-name">
+            <strong>{{ deployment.name }}</strong>
+            <br><small style="color: var(--text-dim); font-size: 0.7rem;">{{ deployment_id[:8] }}...</small>
+          </td>
+          <td>
+            {% if deployment.status == "completed" %}
+              <span class="status-chip ok">✅ Active</span>
+            {% elif deployment.status == "destroyed" %}
+              <span class="status-chip destroyed">🗑️ Destroyed</span>
+            {% elif deployment.status == "destroying" %}
+              <span class="status-chip destroying">🔄 Destroying</span>
+            {% elif deployment.status == "error" or deployment.status == "destroy_error" %}
+              <span class="status-chip err">❌ Error</span>
+            {% else %}
+              <span class="status-chip">🔄 {{ deployment.status }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size: 0.8rem; color: var(--text-dim);">
+            {{ deployment.created_at[:10] }}<br>
+            <small>{{ deployment.created_at[11:16] }}</small>
+          </td>
+          <td>{{ deployment.region }}</td>
+          <td style="font-size: 0.75rem;">
+            Hub, Storage{% if deployment.include_search %}, Search{% endif %}
+            {% if deployment.outputs_available %}
+              <br><span style="color: var(--accent);">✓ Outputs available</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-buttons">
+              {% if deployment.outputs_available and deployment.status != "destroyed" %}
+                <a href="/results/{{ deployment_id }}" class="action-btn view">View</a>
+              {% endif %}
+              {% if deployment.has_state and deployment.status not in ["destroyed", "destroying"] %}
+                <button class="action-btn update" onclick="updateDeployment('{{ deployment_id }}')">Update</button>
+                <button class="action-btn destroy" onclick="destroyDeployment('{{ deployment_id }}')">Delete</button>
+              {% endif %}
+              {% if deployment.status == "destroyed" %}
+                <span style="color: var(--text-dim); font-size: 0.8rem;">No actions available</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state" style="text-align: center; padding: 3rem 2rem; color: var(--text-dim);">
+  <h3>No deployments yet</h3>
+  <p>Create your first Azure AI environment to get started.</p>
+  <a href="/" class="primary" style="text-decoration: none; padding: 0.8rem 1.5rem; border-radius: 8px; background: var(--gradient); color: white; font-weight: 600; display: inline-block; margin-top: 1rem;">Create First Deployment</a>
+</div>
+{% endif %}
+
+<style>
+.deployments-table-wrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.deployments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: var(--panel);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.deployments-table th {
+  background: var(--bg-alt);
+  padding: 0.8rem 0.6rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid #2a313c;
+}
+
+[data-theme="light"] .deployments-table th {
+  background: #f8fafc;
+  border-bottom: 1px solid #d4dde6;
+}
+
+.deployments-table td {
+  padding: 0.8rem 0.6rem;
+  border-bottom: 1px solid #26303c;
+  vertical-align: top;
+}
+
+[data-theme="light"] .deployments-table td {
+  border-bottom: 1px solid #e5e9ed;
+}
+
+.deployment-name {
+  min-width: 150px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.action-btn.view {
+  background: var(--accent);
+  color: white;
+}
+
+.action-btn.update {
+  background: #ffa940;
+  color: white;
+}
+
+.action-btn.destroy {
+  background: var(--danger);
+  color: white;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.status-chip {
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: #233041;
+  color: #6bd3ff;
+}
+
+.status-chip.ok {
+  background: #123524;
+  color: #4de397;
+}
+
+.status-chip.err {
+  background: #3a1414;
+  color: #ff6b6b;
+}
+
+.status-chip.destroyed {
+  background: #2d2d2d;
+  color: #888;
+}
+
+.status-chip.destroying {
+  background: #3d2914;
+  color: #ffb366;
+}
+</style>
+
+{% endblock %}
+
+{% block body_end %}
+<script>
+function updateDeployment(deploymentId) {
+  // TODO: Implement update functionality
+  alert('Update functionality coming in Fase 2!');
+}
+
+function destroyDeployment(deploymentId) {
+  if (confirm('Are you sure you want to destroy this deployment? This will delete all Azure resources and cannot be undone.')) {
+    fetch(`/destroy/${deploymentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        window.location.href = data.redirect;
+      } else {
+        alert('Error: ' + (data.error || 'Unknown error occurred'));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error: Could not start destroy process');
+    });
+  }
+}
+</script>
+{% endblock %}

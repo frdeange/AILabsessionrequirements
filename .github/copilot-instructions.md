@@ -1,84 +1,161 @@
 # AI Assistant Instructions for this Repository
 
 ## Project Overview
-FastAPI web app + Terraform to provision Azure AI resources (AI Services, Foundry Hub & Project, model deployment, Key Vault, Storage, Log Analytics + App Insights, optional Azure AI Search). UI triggers infra provisioning; backend generates `terraform.tfvars` and streams `terraform apply` logs to the browser. Some resources now created via `azapi_resource` fallback (Storage) due to tenant policy forbidding key-based auth.
+FastAPI web app + Terraform implementing a "Multi-Environment Manager" (Terraform Cloud casero) for Azure AI resources. Creates AI Services, Foundry Hub & Project, model deployment, Storage, Log Analytics + App Insights, optional Azure AI Search. Features persistent deployment state, dashboard management, live log streaming, destroy functionality, and .env file generation for workshop/exercise integration.
 
 ## Language restrictions
 In the code, all messages, comments, log output, and variable names must be in English.
 Also you have to describe the commit messages in English.
 
+## Architecture Overview: Multi-Environment Manager
+
+### **Core Components**
+- **`app/main.py`**: FastAPI app with deployment persistence, WebSocket streaming, destroy capability, .env generation
+- **`terraform/`**: Modular IaC split into 6 files (main, ai-services, rbac, storage, search, monitoring)
+- **`deployment_states/`**: Persistent storage for deployment state, logs, and metadata across container restarts
+- **`app/templates/`**: Dashboard UI (`deployments.html`), live logs (`deployment.html`), results with .env download
+
+### **Deployment Lifecycle**
+1. **Create**: Form → tfvars generation → terraform apply with live streaming → state persistence
+2. **Manage**: Dashboard view of all deployments with status, actions, resource info
+3. **Results**: View outputs, download IBM workshop-format .env file with all credentials
+4. **Destroy**: Terraform destroy with live streaming → state cleanup
+
 ## Key Directories / Files
-- `app/main.py`: FastAPI app, form handling, Azure CLI subscription detection, name building, tfvars generation, WebSocket log streaming.
-- `app/templates/*.html`: Jinja2 templates (`index.html` form, `results.html` outputs, `deployment.html` live logs, `base.html`).
-- `app/static/css/style.css`: UI styling (dark/light support hints, layout tweaks).
-- `terraform/`: IaC module (main definitions), includes `main.tf`, `variables.tf`, `outputs.tf`, `providers.tf`.
-- `.github/copilot-instructions.md`: (this file) guidance for AI agents.
 
-## Provisioning Flow
-1. User submits minimal form (model selection + base name, other values derived).
-2. Backend builds deterministic short names + random suffix (e.g. `<base>rgxxxx`, `<base>stgxxxx`).
-3. Writes `terraform/terraform.tfvars` with generated names & toggles.
-4. Runs `terraform init` (if needed) and `terraform apply -auto-approve` while streaming stdout over WebSocket.
-5. On completion, reads `terraform output -json` to display resource info.
+### **Application Layer**
+- `app/main.py`: Central FastAPI app (800+ lines) - deployment management, persistence, WebSocket streaming
+- `app/templates/deployments.html`: Multi-environment dashboard with destroy/view actions
+- `app/templates/results.html`: Outputs display + .env download button (IBM workshop format)
+- `app/templates/deployment.html`: Live log streaming for create/destroy operations
 
-## Resource Architecture (Why)
-- Application Insights now workspace-based (`Log Analytics Workspace` + linkage) to avoid classic ingestion/billing feature 404s.
-- Storage created via `azapi_resource` to bypass provider data-plane polling that fails under tenant policy (Shared Key disabled).
-- RBAC enforced: `shared_access_key_enabled=false` and role assignments (Blob Data Contributor / Reader) for hub, AI Services, current user.
-- AI Foundry Hub + Project layered: Project depends on RBAC propagation (sleep) due to MSI requirement error if roles not ready.
-- Model deployment uses `azurerm_cognitive_deployment` attached to AI Services (no standalone OpenAI account resource).
+### **Infrastructure Layer** 
+- `terraform/main.tf`: Core resources (RG, data sources, service principal)
+- `terraform/ai-services.tf`: Hub, Project, model deployment logic
+- `terraform/rbac.tf`: 15+ role assignments for Hub MSI, current user, service principal
+- `terraform/storage.tf`: azapi_resource for AAD-only storage (tenant policy compliance)
+- `terraform/search.tf`: Optional AI Search with conditional deployment
+- `terraform/monitoring.tf`: Log Analytics + App Insights workspace-based setup
 
-## Important Terraform Patterns
-- Conditional counts: optional search service & model deployment.
-- Role assignments may conflict if pre-existing: strategy is to remove/skip rather than import during rapid iterations.
-- Added `time_sleep` to mitigate eventual consistency for RBAC before creating Foundry Project.
-- Storage outputs switched to data source due to azapi creation (use `data.azurerm_storage_account.stg`).
+### **Persistence Layer**
+- `deployment_states/deployments.json`: Central database of all deployments
+- `deployment_states/{deployment_id}/`: Per-deployment state, tfvars, logs, metadata
 
-## Naming Strategy
-Implemented in `app/main.py` (function building names): base slug + short resource code + random 5–6 char suffix. Keep names within Azure limits (<= 24 for storage). If adding new resources replicate this pattern for consistency.
+## Critical Workflows
 
-## Azure Auth & Subscription Resolution
-Backend tries: explicit subscription form value (if added later) > env vars > `az account show` current > single subscription fallback > first listed. Avoid hardcoding subscription in Terraform; pass via variable if override needed.
+### **Deployment Management**
+```bash
+# Create new deployment
+POST /deploy → run_full_deployment() → save_deployment_state()
 
-## Adding New Resources
-1. Add variables in `variables.tf` and ensure they are written in tfvars writer.
-2. Follow existing naming pattern (extend name map & codes).
-3. Prefer referencing existing RG & location variables.
-4. For RBAC-sensitive resources, add role assignments early (Resource Group scope if possible) + consider sleep for propagation if MSI dependent.
+# Destroy deployment  
+POST /destroy/{id} → run_full_destroy() → state cleanup
+
+# View dashboard
+GET /deployments → load all persistent deployments
+
+# Download .env (IBM workshop format)
+GET /download-env/{id} → formatted environment variables
+```
+
+### **State Persistence**
+- **Startup**: `load_all_deployments()` restores DEPLOYMENTS dict from persistent storage
+- **Runtime**: `save_deployment_state()` called on status changes (terraform, completed, destroyed)
+- **Structure**: Each deployment gets own directory with terraform state, tfvars, metadata.json
+
+### **Live Log Streaming**
+- WebSocket endpoint `/ws/{deployment_id}` streams terraform stdout line-by-line
+- Both create and destroy operations use same streaming mechanism
+- Frontend auto-redirects on completion messages
+
+## Terraform Architecture (Modular)
+
+### **Resource Dependencies**
+```
+main.tf (RG, data sources) 
+  ├── ai-services.tf (Hub → Project with MSI dependency)
+  ├── storage.tf (azapi_resource for AAD-only)
+  ├── search.tf (conditional on include_search)
+  ├── monitoring.tf (Log Analytics → App Insights)
+  └── rbac.tf (15+ role assignments, time_sleep for propagation)
+```
+
+### **Critical Patterns**
+- **Conditional resources**: `count = var.include_search ? 1 : 0` for optional Search
+- **azapi_resource**: Used for Storage (tenant policy), Hub, Project (provider limitations)
+- **RBAC propagation**: `time_sleep` resource before Project creation for MSI role readiness
+- **Naming strategy**: `build_names()` in app/main.py - deterministic short names + random suffix
+
+## Project-Specific Conventions
+
+### **Deployment State Management**
+```python
+# Always save state on status changes
+DEPLOYMENTS[deployment_id]["status"] = "terraform|completed|destroying|destroyed|error"
+save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+
+# Load at startup
+@app.on_event("startup")
+async def startup_event():
+    DEPLOYMENTS.update(load_all_deployments())
+```
+
+### **.env Generation (IBM Workshop Format)**
+- Matches exact IBM Masterclass format with sections and comments
+- Fixed values: `AZURE_OPENAI_API_VERSION="2024-12-01-preview"`, `AZURE_SEARCH_INDEX_NAME="masterclass-index"`
+- Duplicated keys: `AI_FOUNDRY_*` uses same values as `AZURE_OPENAI_*` for workshop compatibility
+
+### **UI State Management**
+- Dashboard shows deployment count, status chips with color coding
+- Actions conditional on state: View (completed), Delete (has_state), Update (disabled)
+- JavaScript handles destroy confirmation, .env download with progress indication
 
 ## Common Pitfalls & Workarounds
-- Storage create 403 (KeyBasedAuthenticationNotPermitted): solved using `azapi_resource` + AAD RBAC; do not reintroduce `azurerm_storage_account` unless tenant policy changes.
-- AI Foundry Project 400 MSI validation: ensure identity blocks and RBAC wait (`time_sleep`).
-- Duplicate Key Vault access policies / role assignments: remove conflicting resource or import; avoid silent recreation loops.
-- Avoid using model version unless explicitly required (left empty for latest).
 
-## Live Log Streaming
-WebSocket endpoint captures Terraform process output line-by-line. If modifying, ensure non-blocking reading (currently subprocess pipe). For new long-running tasks, append to same stream to keep UX consistent.
+### **Terraform State Issues**
+- **Storage 403**: Must use `azapi_resource` + AAD RBAC (tenant policy forbids key-based auth)
+- **Project MSI validation**: Requires `time_sleep` after RBAC assignments before Project creation
+- **Role assignment conflicts**: Remove/skip rather than import during rapid iterations
 
-## Outputs Handling
-`terraform/outputs.tf` deliberately excludes sensitive values except when necessary (Instrumentation Key marked sensitive). Prefer retrieving secret keys via CLI or Key Vault rather than outputs.
+### **Deployment Persistence**
+- **State file handling**: Copy terraform.tfstate to/from deployment_states/ directory for destroy operations
+- **Subscription detection**: Fallback chain: explicit form → env vars → `az account show` → subscription list
+- **WebSocket connection**: Non-blocking subprocess pipe reading, proper error handling
 
-## Extending Model Options
-Safe list: ALLOWED_MODEL_NAMES in `app/main.py`. To add: update the list, adjust UI dropdown (index.html), no other Terraform change required unless SKU/model constraints differ.
+### **Multi-Environment Conflicts**
+- Use deployment-specific directories to avoid terraform state conflicts
+- Always copy state files back to terraform/ directory before operations
+- Clean up terraform.tfstate after successful destroy
 
-## Testing / Validation Tips
-- Run `terraform validate` inside `terraform/` after edits.
-- Use `terraform plan -lock=false` to preview without blocking active state operations.
-- For iterative RBAC tweaks, target apply with `-target=azurerm_role_assignment.name` if partial.
+## Integration Points
 
-## Security Considerations
-- No account keys surfaced (policy enforces this). Use Azure AD + RBAC.
-- Do not add secrets to outputs; prefer Key Vault integration if secrets become necessary.
+### **Azure CLI Integration**
+- `ensure_azure_login()`: Subscription detection and login verification before terraform
+- Respect subscription resolution order: explicit > env vars > current > single > first listed
 
-## When Adding Automation
-If you must script Azure CLI steps post-provision (e.g., retrieving keys), integrate after successful apply and stream those logs similarly; ensure CLI calls respect subscription resolution logic.
+### **Workshop/Exercise Integration**
+- `/download-env/{id}` generates IBM workshop-compatible .env files
+- Includes all credentials, fixed API versions, deployment names for seamless exercise integration
 
-## Style / Conventions Recap
-- Python: keep logic centralized in `app/main.py` (single-file simplicity). If complexity grows, split by concerns (naming, terraform_runner, azure_auth) but preserve current naming patterns.
-- Terraform: keep all in root module for now; group sections with clear header comments (follow existing delimiter style of hash lines + title).
+## Security Patterns
+- **No key-based storage auth**: azapi_resource + AAD RBAC only
+- **Sensitive outputs**: Mark keys as sensitive in terraform outputs
+- **Service Principal**: Auto-generated with expiration date, proper secret rotation
 
-## Quick Commands (reference)
-- Start app: `uvicorn app.main:app --reload`
-- Destroy infra: `cd terraform && terraform destroy -auto-approve`
+## Testing / Validation
+```bash
+# Validate all terraform files
+cd terraform && terraform validate
 
-Provide feedback if any area needs deeper detail (e.g., adding tests, refactoring app into packages, or handling secrets via Key Vault).
+# Test deployment persistence
+# Check deployment_states/ structure after operations
+
+# Verify .env download
+# curl /download-env/{id} → should match IBM workshop format
+```
+
+## Quick Commands
+- **Start app**: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- **Validate terraform**: `cd terraform && terraform validate`
+- **Manual destroy**: `cd terraform && terraform destroy -auto-approve`
+- **Check persistence**: `ls deployment_states/` and `cat deployment_states/deployments.json`

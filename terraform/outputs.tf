@@ -138,3 +138,13 @@ output "service_principal_secret" {
   sensitive   = true
   description = "Secret value for the Service Principal"
 }
+
+output "tenant_id" {
+  value       = data.azurerm_client_config.current.tenant_id
+  description = "Azure AD tenant ID"
+}
+
+output "subscription_id" {
+  value       = data.azurerm_client_config.current.subscription_id
+  description = "Azure subscription ID"
+}

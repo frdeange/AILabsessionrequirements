@@ -92,6 +92,16 @@
   </table>
 </div>
 
+<!-- Download .env file -->
+<div style="margin: 1.5rem 0; text-align: center;">
+  <button id="downloadEnv" class="download-env-btn" onclick="downloadEnvFile('{{ deployment_id }}')">
+    📄 Download .env file
+  </button>
+  <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">
+    Get all environment variables in a ready-to-use .env format
+  </p>
+</div>
+
 <!-- Additional Details Section -->
 <h2 style="margin-top:2rem;">Additional Details</h2>
 <div class="results-table-wrapper">
@@ -113,6 +123,29 @@
 
 <p style="margin-top:1.4rem; font-size:.75rem; color:var(--text-dim);">Remember to rotate keys before sharing externally. Destroy resources when no longer needed.</p>
 <p><a href="/">New deployment</a></p>
+
+<style>
+.download-env-btn {
+  background: var(--gradient);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.download-env-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.download-env-btn:active {
+  transform: translateY(0px);
+}
+</style>
 {% endblock %}
 {% block body_end %}
 <script>
@@ -123,5 +156,43 @@
       setTimeout(()=> btn.textContent='Copy', 1200);
     });
   });
+
+  function downloadEnvFile(deploymentId) {
+    const btn = document.getElementById('downloadEnv');
+    btn.textContent = '⏳ Generating...';
+    btn.disabled = true;
+    
+    fetch(`/download-env/${deploymentId}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to generate .env file');
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `azure-ai-${deploymentId.substring(0, 8)}.env`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        btn.textContent = '✅ Downloaded!';
+        setTimeout(() => {
+          btn.textContent = '📄 Download .env file';
+          btn.disabled = false;
+        }, 2000);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        btn.textContent = '❌ Error';
+        setTimeout(() => {
+          btn.textContent = '📄 Download .env file';
+          btn.disabled = false;
+        }, 2000);
+      });
+  }
 </script>
 {% endblock %}

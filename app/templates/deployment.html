@@ -10,6 +10,23 @@
   <div id="log"></div>
 </div>
 <p class="notice">Browser will auto redirect to results once provisioning completes.</p>
+
+<style>
+.status-chip.ok {
+  background: #123524;
+  color: #4de397;
+}
+
+.status-chip.err {
+  background: #3a1414;
+  color: #ff6b6b;
+}
+
+.status-chip.destroyed {
+  background: #2d2d2d;
+  color: #888;
+}
+</style>
 {% endblock %}
 {% block body_end %}
 <script>
@@ -27,7 +44,12 @@
       statusChip.classList.add('ok');
       setTimeout(()=> { window.location.href = `/results/${deploymentId}`; }, 1200);
     }
-    if (e.data.startsWith('ERROR:')) {
+    if (e.data.includes('Resources destroyed successfully')) {
+      statusChip.textContent = 'destroyed';
+      statusChip.classList.add('destroyed');
+      setTimeout(()=> { window.location.href = `/deployments`; }, 1200);
+    }
+    if (e.data.startsWith('ERROR:') || e.data.includes('ERROR during destroy')) {
       statusChip.textContent = 'error';
       statusChip.classList.remove('ok');
       statusChip.classList.add('err');
