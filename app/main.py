@@ -95,12 +95,15 @@ def save_deployment_state(deployment_id: str, deployment_data: Dict, outputs: Di
 
         effective_outputs = outputs if outputs is not None else deployment_data.get("outputs", {})
 
+        # Check for terraform state in deployment directory instead of shared directory
+        deployment_state = deployment_dir / "terraform.tfstate"
+        
         metadata = {
             "deployment_id": deployment_id,
             "deployment_data": deployment_data,
             "outputs": effective_outputs,
             "saved_at": ts,
-            "has_state": terraform_state.exists(),
+            "has_state": deployment_state.exists(),
             "status": deployment_data.get("status", "unknown")
         }
 
@@ -114,7 +117,7 @@ def save_deployment_state(deployment_id: str, deployment_data: Dict, outputs: Di
             "status": deployment_data.get("status", "unknown"),
             # Keep first created_at if present, else set now.
             "created_at": db.get("deployments", {}).get(deployment_id, {}).get("created_at") or ts,
-            "has_state": terraform_state.exists(),
+            "has_state": deployment_state.exists(),
             "outputs_available": bool(effective_outputs),
             "region": deployment_data.get("params", {}).get("location", "unknown"),
             "include_search": deployment_data.get("params", {}).get("include_search", False),
@@ -173,6 +176,27 @@ def sanitize_base(base: str) -> str:
     allowed = string.ascii_lowercase + string.digits
     base = base.lower()
     return ''.join(c for c in base if c in allowed)
+
+
+def copy_terraform_files(source_dir: Path, dest_dir: Path) -> None:
+    """Copy all .tf files from source to destination directory for isolated terraform execution."""
+    import shutil
+    
+    # Ensure destination directory exists
+    dest_dir.mkdir(exist_ok=True)
+    
+    # Copy all .tf files
+    tf_files = source_dir.glob("*.tf")
+    for tf_file in tf_files:
+        shutil.copy2(tf_file, dest_dir / tf_file.name)
+
+
+def cleanup_terraform_files(deployment_dir: Path) -> None:
+    """Remove .tf files from deployment directory after successful operations, keeping only state and vars."""
+    tf_files = deployment_dir.glob("*.tf")
+    for tf_file in tf_files:
+        if tf_file.exists():
+            tf_file.unlink()
 
 
 def build_names(base: str) -> Dict[str, str]:
@@ -595,7 +619,17 @@ async def run_full_deployment(deployment_id: str):
         save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
         # Ensure Azure login first (before terraform so provider auth works)
         await ensure_azure_login(deployment_id)
-        # Prepare terraform.tfvars
+        
+        # Create isolated deployment directory with terraform files
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        deployment_dir.mkdir(exist_ok=True)
+        
+        # Copy terraform files to deployment directory for isolated execution
+        append_log(deployment_id, "[SETUP] Creating isolated terraform workspace")
+        copy_terraform_files(TERRAFORM_DIR, deployment_dir)
+        append_log(deployment_id, f"[SETUP] Copied terraform files to {deployment_dir}")
+        
+        # Prepare terraform.tfvars in deployment directory
         tfvars_content = (
             f"rg_name = \"RG-{params['resource_group_base']}\"\n"
             f"location = \"{params['location']}\"\n"
@@ -617,7 +651,7 @@ async def run_full_deployment(deployment_id: str):
         )
         if params.get("subscription_id"):
             tfvars_content += f"\nsubscription_id = \"{params['subscription_id']}\""
-        tfvars_path = TERRAFORM_DIR / "terraform.tfvars"
+        tfvars_path = deployment_dir / "terraform.tfvars"
         tfvars_path.write_text(tfvars_content, encoding="utf-8")
         append_log(deployment_id, f"[DEBUG] include_search={params['include_search']} search_service_name={names['search_service_name']}")
 
@@ -631,21 +665,14 @@ async def run_full_deployment(deployment_id: str):
             append_log(deployment_id, f"[PRECHECK][WARN] Could not read 'az account show': {e}")
         append_log(deployment_id, "[PRECHECK] (Future) Query specific quotas for Cognitive, AI Foundry and Storage.")
 
-        # Clean up any previous terraform state to avoid cross-deployment conflicts
-        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
-        terraform_backup = TERRAFORM_DIR / "terraform.tfstate.backup"
-        if terraform_state.exists():
-            terraform_state.unlink()
-            append_log(deployment_id, "[CLEANUP] Removed previous terraform state")
-        if terraform_backup.exists():
-            terraform_backup.unlink()
-            append_log(deployment_id, "[CLEANUP] Removed previous terraform state backup")
-
-        # Terraform init & apply
-        await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=TERRAFORM_DIR)
-        await run_cmd_stream(deployment_id, ["terraform", "apply", "-auto-approve"], cwd=TERRAFORM_DIR, max_retries=2, retry_delay=60)
+        # Terraform init & apply - now executed in isolated deployment directory
+        append_log(deployment_id, f"[TERRAFORM] Executing in isolated workspace: {deployment_dir}")
+        await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=deployment_dir)
+        await run_cmd_stream(deployment_id, ["terraform", "apply", "-auto-approve"], cwd=deployment_dir, max_retries=2, retry_delay=60)
         # Terraform outputs
-        out_raw = subprocess.check_output(["terraform", "output", "-json"], cwd=str(TERRAFORM_DIR))
+        # Get outputs from deployment directory instead of shared terraform directory
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        out_raw = subprocess.check_output(["terraform", "output", "-json"], cwd=str(deployment_dir))
         outputs = json.loads(out_raw.decode())
         simplified = {k: v.get("value") for k, v in outputs.items()}
         DEPLOYMENTS[deployment_id]["outputs"].update(simplified)
@@ -749,11 +776,22 @@ async def run_full_deployment(deployment_id: str):
             except Exception as e:  # noqa
                 append_log(deployment_id, f"[WARN] Could not fetch Search keys: {e}")
 
+        # Clean up terraform files but keep state and variables for potential destroy
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        cleanup_terraform_files(deployment_dir)
+        append_log(deployment_id, "[CLEANUP] Removed terraform files, kept state and variables")
+        
         DEPLOYMENTS[deployment_id]["status"] = "completed"
         append_log(deployment_id, "Deployment completed successfully")
         # Save deployment state persistently (include outputs so dashboard flags it)
         save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id], DEPLOYMENTS[deployment_id].get("outputs", {}))
     except Exception as e:  # noqa
+        # Clean up terraform files on error too
+        deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        if deployment_dir.exists():
+            cleanup_terraform_files(deployment_dir)
+            append_log(deployment_id, "[CLEANUP] Removed terraform files due to error")
+        
         DEPLOYMENTS[deployment_id]["status"] = "error"
         append_log(deployment_id, f"ERROR: {e}")
         # Save deployment state even on error (outputs may be partial)
@@ -771,49 +809,34 @@ async def run_full_destroy(deployment_id: str):
         # Ensure Azure login first
         await ensure_azure_login(deployment_id)
         
-        # Clean terraform directory completely to avoid cross-deployment conflicts
-        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
-        terraform_backup = TERRAFORM_DIR / "terraform.tfstate.backup"  
-        terraform_tfvars = TERRAFORM_DIR / "terraform.tfvars"
-        
-        for file in [terraform_state, terraform_backup, terraform_tfvars]:
-            if file.exists():
-                file.unlink()
-        append_log(deployment_id, "[CLEANUP] Cleared terraform directory for destroy")
-        
-        # Copy THIS deployment's state and tfvars back to terraform directory
+        # Setup isolated deployment directory for destroy
         deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
+        
+        # Verify state files exist
         state_file = deployment_dir / "terraform.tfstate"
         tfvars_file = deployment_dir / "terraform.tfvars"
         
-        if state_file.exists():
-            import shutil
-            shutil.copy(state_file, TERRAFORM_DIR / "terraform.tfstate")
-            append_log(deployment_id, f"Copied terraform state for deployment {deployment_id[:8]}")
-        else:
+        if not state_file.exists():
             append_log(deployment_id, f"[ERROR] No terraform state found for deployment {deployment_id[:8]}")
             raise RuntimeError(f"Cannot destroy deployment {deployment_id[:8]}: no terraform state found")
+            
+        # Copy current terraform files to deployment directory for destroy
+        append_log(deployment_id, "[SETUP] Creating isolated terraform workspace for destroy")
+        copy_terraform_files(TERRAFORM_DIR, deployment_dir)
+        append_log(deployment_id, f"[SETUP] Using terraform files with existing state in {deployment_dir}")
         
-        if tfvars_file.exists():
-            import shutil
-            shutil.copy(tfvars_file, TERRAFORM_DIR / "terraform.tfvars")
-            append_log(deployment_id, f"Copied terraform tfvars for deployment {deployment_id[:8]}")
-        else:
-            append_log(deployment_id, f"[WARN] No terraform tfvars found for deployment {deployment_id[:8]}")
-        
-        # Run terraform destroy with retry logic for Azure 409 conflicts
+        # Run terraform destroy with retry logic - executed in isolated deployment directory  
+        append_log(deployment_id, f"[TERRAFORM] Destroying from isolated workspace: {deployment_dir}")
         append_log(deployment_id, "Starting terraform destroy...")
-        await run_cmd_stream(deployment_id, ["terraform", "destroy", "-auto-approve"], cwd=TERRAFORM_DIR, max_retries=2, retry_delay=30)
+        await run_cmd_stream(deployment_id, ["terraform", "destroy", "-auto-approve"], cwd=deployment_dir, max_retries=2, retry_delay=30)
         
         # If we reach here, destroy succeeded
         DEPLOYMENTS[deployment_id]["status"] = "destroyed"
         append_log(deployment_id, "Resources destroyed successfully")
         
-        # Clean up state files after successful destroy
-        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
-        if terraform_state.exists():
-            terraform_state.unlink()
-            append_log(deployment_id, "Cleaned up terraform state file")
+        # Clean up terraform files in deployment directory after successful destroy
+        cleanup_terraform_files(deployment_dir)
+        append_log(deployment_id, "[CLEANUP] Cleaned up terraform files after successful destroy")
         
         # Remove outputs since resources no longer exist
         DEPLOYMENTS[deployment_id]["outputs"] = {}
