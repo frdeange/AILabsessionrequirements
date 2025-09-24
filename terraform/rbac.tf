@@ -128,6 +128,24 @@ resource "azurerm_role_assignment" "search_service_contributor_current_user" {
 # RBAC for Service Principal
 ###############################################
 
+###############################################
+# RBAC for Azure AI Search Service Managed Identity (new)
+###############################################
+
+# Grant the Search service managed identity permissions over the Storage Account so that
+# indexers / enrichment pipelines can both read and write artifacts (blob + possible skill outputs).
+# Using Contributor level for blobs (as requested) to avoid permission friction during workshops.
+resource "azurerm_role_assignment" "storage_blob_data_contributor_search_mi" {
+  count = var.include_search ? 1 : 0
+  depends_on = [
+    azurerm_search_service.search
+  ]
+  scope                = azurerm_storage_account.stg.id
+  role_definition_name = "Storage Blob Data Contributor"
+  # identity is a list in the schema; use first (only) element
+  principal_id         = azurerm_search_service.search[0].identity[0].principal_id
+}
+
 # Storage Blob Data Contributor for Service Principal
 resource "azurerm_role_assignment" "storage_blob_data_contributor_sp" {
   depends_on = [

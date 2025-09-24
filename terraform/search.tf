@@ -10,6 +10,12 @@ resource "azurerm_search_service" "search" {
   replica_count       = 1
   partition_count     = 1
   hosting_mode        = "default"
+  local_authentication_enabled = true
+  authentication_failure_mode = "http403"
+  semantic_search_sku = "standard"
+  identity {
+    type = "SystemAssigned"
+    }
 }
 
 ###############################################
