@@ -229,6 +229,26 @@ All other resource information for advanced scenarios.
         └── metadata.json
 ```
 
+### 🎯 **Modular Service Architecture** 
+The application features a clean, service-oriented architecture for maximum maintainability:
+
+```
+📁 app/
+├── 📄 main.py - FastAPI routes & configuration
+├── 📄 config.py - Centralized application settings
+├── 🛠️ utils/
+│   ├── 📄 naming.py - Azure-compliant resource naming
+│   ├── 📄 file_operations.py - Terraform file management  
+│   └── 📄 env_generator.py - .env file generation
+└── 🚀 services/
+    ├── 📄 validation_service.py - Form & parameter validation
+    ├── 📄 persistence_service.py - State & database management
+    ├── 📄 azure_service.py - Azure CLI & credential operations
+    ├── 📄 terraform_service.py - Infrastructure as Code operations
+    └── 📄 deployment_service.py - High-level workflow orchestration
+```
+
+
 ### Key Design Decisions
 
 #### 🔧 **Technology Choices**
@@ -324,12 +344,23 @@ az account show
 
 ## 🧪 What's New in This Version
 
-### 🆕 Recent Updates
+### 🆕 Major Updates in This Version
+
+#### 🏗️ **Complete Architectural Refactoring**
+- ✅ **Modular Service Architecture** - Complete separation of concerns
+- ✅ **70% Code Reduction** - main.py simplified from 856 to 221 lines
+- ✅ **Service-Oriented Design** - 6 dedicated service modules
+- ✅ **Modern FastAPI Patterns** - Updated to lifespan events (no deprecations)
+- ✅ **Centralized Configuration** - All settings in dedicated config module
+
+#### 🎛️ **Enhanced Multi-Environment Features**
 - ✅ **Multi-Environment Manager** - Dashboard to manage multiple deployments
 - ✅ **Persistent State** - Deployments survive container restarts 
 - ✅ **Destroy Functionality** - Safe resource cleanup with live streaming
 - ✅ **Download .env Files** - Export credentials in ready-to-use format
 - ✅ **Enhanced Dashboard** - Status tracking and deployment management
+
+#### 🔧 **Technical Improvements**
 - ✅ **Fixed AI Foundry Project URLs** - Now extracts real API endpoints
 - ✅ **Enhanced Results UI** - Organized sections for better UX
 - ✅ **Improved Security** - Full AAD authentication, no shared keys
