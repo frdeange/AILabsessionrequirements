@@ -181,14 +181,14 @@ resource "azurerm_role_assignment" "search_service_contributor_sp" {
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 
-# Application Insights Reader for Service Principal
-resource "azurerm_role_assignment" "app_insights_reader_sp" {
+# Application Insights Monitoring Contributor for Service Principal
+resource "azurerm_role_assignment" "app_insights_monitoring_contributor_sp" {
   depends_on = [
     azapi_resource.hub,
     time_sleep.wait_for_hub_stability
   ]
   scope                = azurerm_application_insights.appins.id
-  role_definition_name = "Application Insights Reader"
+  role_definition_name = "Monitoring Contributor"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 
@@ -199,7 +199,7 @@ resource "azurerm_role_assignment" "sp_ai_project_manager" {
     time_sleep.wait_for_hub_stability
   ]
   scope                = azapi_resource.hub.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/eadc314b-1a2d-4efa-be10-5d325db5065e"
+  role_definition_name = "Azure AI Project Manager"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 
@@ -210,7 +210,7 @@ resource "azurerm_role_assignment" "sp_ai_user" {
     time_sleep.wait_for_hub_stability
   ]
   scope                = azapi_resource.hub.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
+  role_definition_name = "Azure AI User"
   principal_id         = azuread_service_principal.workshop_sp.object_id
 }
 

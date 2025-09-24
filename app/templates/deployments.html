@@ -63,7 +63,7 @@
           </td>
           <td>
             <div class="action-buttons">
-              {% if deployment.outputs_available and deployment.status != "destroyed" %}
+              {% if deployment.status == "completed" %}
                 <a href="/results/{{ deployment_id }}" class="action-btn view">View</a>
               {% endif %}
               {% if deployment.has_state and deployment.status not in ["destroyed", "destroying"] %}

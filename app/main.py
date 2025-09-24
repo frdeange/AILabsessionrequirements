@@ -73,54 +73,55 @@ def save_deployments_db(db: Dict) -> None:
     except Exception as e:
         print(f"Error saving deployments database: {e}")
 
-def save_deployment_state(deployment_id: str, deployment_data: Dict, outputs: Dict = None) -> None:
-    """Save deployment state and metadata persistently"""
+def save_deployment_state(deployment_id: str, deployment_data: Dict, outputs: Dict | None = None) -> None:
+    """Persist deployment runtime + outputs to disk and index file.
+
+    outputs param allows forcing new outputs; if not provided uses deployment_data['outputs'].
+    """
     try:
-        # Create deployment directory
+        ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
         deployment_dir.mkdir(exist_ok=True)
-        
-        # Save terraform state if exists
+
         terraform_state = TERRAFORM_DIR / "terraform.tfstate"
         if terraform_state.exists():
             import shutil
             shutil.copy(terraform_state, deployment_dir / "terraform.tfstate")
-        
-        # Save terraform tfvars if exists
+
         terraform_tfvars = TERRAFORM_DIR / "terraform.tfvars"
         if terraform_tfvars.exists():
             import shutil
             shutil.copy(terraform_tfvars, deployment_dir / "terraform.tfvars")
-        
-        # Save deployment metadata
+
+        effective_outputs = outputs if outputs is not None else deployment_data.get("outputs", {})
+
         metadata = {
             "deployment_id": deployment_id,
             "deployment_data": deployment_data,
-            "outputs": outputs or {},
-            "saved_at": "2025-09-23T09:50:00Z",
+            "outputs": effective_outputs,
+            "saved_at": ts,
             "has_state": terraform_state.exists(),
             "status": deployment_data.get("status", "unknown")
         }
-        
+
         with open(deployment_dir / "metadata.json", 'w') as f:
             json.dump(metadata, f, indent=2)
-        
-        # Update main database
+
         db = load_deployments_db()
         db["deployments"][deployment_id] = {
             "id": deployment_id,
             "name": deployment_data.get("params", {}).get("resource_group_base", "Unknown"),
             "status": deployment_data.get("status", "unknown"),
-            "created_at": "2025-09-23T09:50:00Z",
+            # Keep first created_at if present, else set now.
+            "created_at": db.get("deployments", {}).get(deployment_id, {}).get("created_at") or ts,
             "has_state": terraform_state.exists(),
-            "outputs_available": bool(outputs),
+            "outputs_available": bool(effective_outputs),
             "region": deployment_data.get("params", {}).get("location", "unknown"),
             "include_search": deployment_data.get("params", {}).get("include_search", False),
             "resource_names": deployment_data.get("names", {})
         }
         save_deployments_db(db)
-        
-    except Exception as e:
+    except Exception as e:  # noqa
         print(f"Error saving deployment state for {deployment_id}: {e}")
 
 def load_deployment_state(deployment_id: str) -> Dict:
@@ -630,6 +631,16 @@ async def run_full_deployment(deployment_id: str):
             append_log(deployment_id, f"[PRECHECK][WARN] Could not read 'az account show': {e}")
         append_log(deployment_id, "[PRECHECK] (Future) Query specific quotas for Cognitive, AI Foundry and Storage.")
 
+        # Clean up any previous terraform state to avoid cross-deployment conflicts
+        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
+        terraform_backup = TERRAFORM_DIR / "terraform.tfstate.backup"
+        if terraform_state.exists():
+            terraform_state.unlink()
+            append_log(deployment_id, "[CLEANUP] Removed previous terraform state")
+        if terraform_backup.exists():
+            terraform_backup.unlink()
+            append_log(deployment_id, "[CLEANUP] Removed previous terraform state backup")
+
         # Terraform init & apply
         await run_cmd_stream(deployment_id, ["terraform", "init"], cwd=TERRAFORM_DIR)
         await run_cmd_stream(deployment_id, ["terraform", "apply", "-auto-approve"], cwd=TERRAFORM_DIR, max_retries=2, retry_delay=60)
@@ -740,13 +751,13 @@ async def run_full_deployment(deployment_id: str):
 
         DEPLOYMENTS[deployment_id]["status"] = "completed"
         append_log(deployment_id, "Deployment completed successfully")
-        # Save deployment state persistently
-        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+        # Save deployment state persistently (include outputs so dashboard flags it)
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id], DEPLOYMENTS[deployment_id].get("outputs", {}))
     except Exception as e:  # noqa
         DEPLOYMENTS[deployment_id]["status"] = "error"
         append_log(deployment_id, f"ERROR: {e}")
-        # Save deployment state even on error
-        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
+        # Save deployment state even on error (outputs may be partial)
+        save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id], DEPLOYMENTS[deployment_id].get("outputs", {}))
 
 
 async def run_full_destroy(deployment_id: str):
@@ -760,59 +771,52 @@ async def run_full_destroy(deployment_id: str):
         # Ensure Azure login first
         await ensure_azure_login(deployment_id)
         
-        # Copy state file back to terraform directory
+        # Clean terraform directory completely to avoid cross-deployment conflicts
+        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
+        terraform_backup = TERRAFORM_DIR / "terraform.tfstate.backup"  
+        terraform_tfvars = TERRAFORM_DIR / "terraform.tfvars"
+        
+        for file in [terraform_state, terraform_backup, terraform_tfvars]:
+            if file.exists():
+                file.unlink()
+        append_log(deployment_id, "[CLEANUP] Cleared terraform directory for destroy")
+        
+        # Copy THIS deployment's state and tfvars back to terraform directory
         deployment_dir = DEPLOYMENT_STATES_DIR / deployment_id
         state_file = deployment_dir / "terraform.tfstate"
         tfvars_file = deployment_dir / "terraform.tfvars"
         
-        # Copy terraform state and tfvars back to terraform directory
         if state_file.exists():
             import shutil
             shutil.copy(state_file, TERRAFORM_DIR / "terraform.tfstate")
-            append_log(deployment_id, "Copied terraform state for destroy operation")
+            append_log(deployment_id, f"Copied terraform state for deployment {deployment_id[:8]}")
+        else:
+            append_log(deployment_id, f"[ERROR] No terraform state found for deployment {deployment_id[:8]}")
+            raise RuntimeError(f"Cannot destroy deployment {deployment_id[:8]}: no terraform state found")
         
         if tfvars_file.exists():
             import shutil
             shutil.copy(tfvars_file, TERRAFORM_DIR / "terraform.tfvars")
-            append_log(deployment_id, "Copied terraform tfvars for destroy operation")
-        
-        # Run terraform destroy
-        append_log(deployment_id, "Starting terraform destroy...")
-        destroy_process = await asyncio.create_subprocess_exec(
-            "terraform", "destroy", "-auto-approve",
-            cwd=TERRAFORM_DIR,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            env=dict(os.environ, **{"TF_LOG": "INFO"})
-        )
-        
-        # Stream destroy output
-        while True:
-            line = await destroy_process.stdout.readline()
-            if not line:
-                break
-            line_str = line.decode("utf-8", errors="ignore").strip()
-            if line_str:
-                append_log(deployment_id, line_str)
-        
-        await destroy_process.wait()
-        
-        if destroy_process.returncode == 0:
-            DEPLOYMENTS[deployment_id]["status"] = "destroyed"
-            append_log(deployment_id, "Resources destroyed successfully")
-            
-            # Clean up state files after successful destroy
-            terraform_state = TERRAFORM_DIR / "terraform.tfstate"
-            if terraform_state.exists():
-                terraform_state.unlink()
-                append_log(deployment_id, "Cleaned up terraform state file")
-            
-            # Remove outputs since resources no longer exist
-            DEPLOYMENTS[deployment_id]["outputs"] = {}
-            
+            append_log(deployment_id, f"Copied terraform tfvars for deployment {deployment_id[:8]}")
         else:
-            DEPLOYMENTS[deployment_id]["status"] = "destroy_error"
-            append_log(deployment_id, f"Terraform destroy failed with exit code {destroy_process.returncode}")
+            append_log(deployment_id, f"[WARN] No terraform tfvars found for deployment {deployment_id[:8]}")
+        
+        # Run terraform destroy with retry logic for Azure 409 conflicts
+        append_log(deployment_id, "Starting terraform destroy...")
+        await run_cmd_stream(deployment_id, ["terraform", "destroy", "-auto-approve"], cwd=TERRAFORM_DIR, max_retries=2, retry_delay=30)
+        
+        # If we reach here, destroy succeeded
+        DEPLOYMENTS[deployment_id]["status"] = "destroyed"
+        append_log(deployment_id, "Resources destroyed successfully")
+        
+        # Clean up state files after successful destroy
+        terraform_state = TERRAFORM_DIR / "terraform.tfstate"
+        if terraform_state.exists():
+            terraform_state.unlink()
+            append_log(deployment_id, "Cleaned up terraform state file")
+        
+        # Remove outputs since resources no longer exist
+        DEPLOYMENTS[deployment_id]["outputs"] = {}
         
         # Save final deployment state persistently
         save_deployment_state(deployment_id, DEPLOYMENTS[deployment_id])
