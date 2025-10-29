@@ -11,7 +11,7 @@
   - `[CMD] terraform apply -auto-approve`
   - Resource creation messages
   - `azapi_resource.hub: Creating...`
-  - `azuread_service_principal.workshop_sp: Creation complete`
+  - `azuread_service_principal.deployment_sp: Creation complete`
 
 **Recommended filename:** `deployment-progress.png`
 **Recommended size:** 1200x800px

@@ -129,12 +129,12 @@ output "ai_foundry_project_principal_id" {
 
 # Service Principal outputs
 output "service_principal_app_id" {
-  value       = azuread_application.workshop_app.client_id
+  value       = azuread_application.deployment_app.client_id
   description = "Application (client) ID of the Service Principal"
 }
 
 output "service_principal_secret" {
-  value       = azuread_application_password.workshop_secret.value
+  value       = azuread_application_password.deployment_secret.value
   sensitive   = true
   description = "Secret value for the Service Principal"
 }

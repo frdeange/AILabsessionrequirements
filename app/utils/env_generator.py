@@ -1,15 +1,15 @@
 """
-Environment file generator for IBM Workshop format.
+Environment file generator for Azure AI deployments.
 
-This module generates .env files compatible with IBM Masterclass Day 1 format,
-containing all necessary Azure AI service credentials and configurations.
+This module generates .env files containing all necessary Azure AI service 
+credentials and configurations for easy integration with AI projects.
 """
 from datetime import datetime
 from typing import Dict, Optional
 
 
-def generate_ibm_env_content(deployment_id: str, outputs: Dict, params: Optional[Dict] = None) -> str:
-    """Generate .env file content in IBM Masterclass format.
+def generate_env_content(deployment_id: str, outputs: Dict, params: Optional[Dict] = None) -> str:
+    """Generate .env file content with Azure AI credentials.
     
     Args:
         deployment_id: Unique deployment identifier
@@ -23,7 +23,7 @@ def generate_ibm_env_content(deployment_id: str, outputs: Dict, params: Optional
         params = {}
         
     env_content = "# =============================================================================\\n"
-    env_content += "# IBM Masterclass Day 1 - Environment Configuration\\n"
+    env_content += "# Azure AI Environment Configuration\\n"
     env_content += "# =============================================================================\\n"
     env_content += f"# Generated from Azure AI deployment: {deployment_id[:8]}\\n"
     env_content += f"# Created at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\\n"
@@ -46,7 +46,7 @@ def generate_ibm_env_content(deployment_id: str, outputs: Dict, params: Optional
     
     # Azure OpenAI Configuration
     env_content += "\\n# =============================================================================\\n"
-    env_content += "# Azure OpenAI Configuration (EX1, EX3, EX4, EX5, EX6)\\n"
+    env_content += "# Azure OpenAI Configuration\\n"
     env_content += "# =============================================================================\\n"
     if outputs.get("openai_endpoint"):
         env_content += f'AZURE_OPENAI_ENDPOINT="{outputs["openai_endpoint"]}"\\n'
@@ -54,13 +54,13 @@ def generate_ibm_env_content(deployment_id: str, outputs: Dict, params: Optional
         env_content += f'AZURE_OPENAI_API_KEY="{outputs["azure_openai_key"]}"\\n'
     if outputs.get("openai_deployment_name"):
         env_content += f'AZURE_OPENAI_DEPLOYMENT_NAME="{outputs["openai_deployment_name"]}"\\n'
-    # Fixed values from the workshop
+    # Default API version
     env_content += 'AZURE_OPENAI_API_VERSION="2024-12-01-preview"\\n'
     env_content += 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"\\n'
     
     # Azure AI Foundry / AI Studio
     env_content += "\\n# =============================================================================\\n"
-    env_content += "# Azure AI Foundry / AI Studio (EX2, EX4, EX5, EX6)\\n"
+    env_content += "# Azure AI Foundry / AI Studio\\n"
     env_content += "# =============================================================================\\n"
     # Use AI inference endpoint for Foundry (different from project URL)
     if outputs.get("ai_inference_endpoint"):
@@ -77,14 +77,14 @@ def generate_ibm_env_content(deployment_id: str, outputs: Dict, params: Optional
     
     # Azure AI Search Configuration
     env_content += "\\n# =============================================================================\\n"
-    env_content += "# Azure AI Search Configuration (EX3)\\n"
+    env_content += "# Azure AI Search Configuration\\n"
     env_content += "# =============================================================================\\n"
     if outputs.get("search_service_endpoint"):
         env_content += f'AZURE_SEARCH_ENDPOINT="{outputs["search_service_endpoint"]}"\\n'
     if outputs.get("azure_search_admin_key"):
         env_content += f'AZURE_SEARCH_API_KEY="{outputs["azure_search_admin_key"]}"\\n'
-    # Fixed index name from workshop
-    env_content += 'AZURE_SEARCH_INDEX_NAME="masterclass-index"\\n'
+    # Default index name
+    env_content += 'AZURE_SEARCH_INDEX_NAME="ai-search-index"\\n'
     
     # Logging and Monitoring
     env_content += "\\n# =============================================================================\\n"

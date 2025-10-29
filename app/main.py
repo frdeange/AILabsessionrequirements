@@ -19,7 +19,7 @@ from .config import (
 
 # Import utilities
 from .utils.naming import build_names
-from .utils.env_generator import generate_ibm_env_content, generate_env_filename
+from .utils.env_generator import generate_env_content, generate_env_filename
 
 # Import services  
 from .services.persistence_service import (
@@ -177,7 +177,7 @@ async def download_env_file(deployment_id: str):
         return JSONResponse({"error": "No outputs available for this deployment"}, status_code=400)
     
     # Generate .env content using utility function
-    env_content = generate_ibm_env_content(
+    env_content = generate_env_content(
         deployment_id=deployment_id,
         outputs=outputs, 
         params=data.get("params", {})

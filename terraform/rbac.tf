@@ -134,7 +134,7 @@ resource "azurerm_role_assignment" "search_service_contributor_current_user" {
 
 # Grant the Search service managed identity permissions over the Storage Account so that
 # indexers / enrichment pipelines can both read and write artifacts (blob + possible skill outputs).
-# Using Contributor level for blobs (as requested) to avoid permission friction during workshops.
+# Using Contributor level for blobs to avoid permission issues.
 resource "azurerm_role_assignment" "storage_blob_data_contributor_search_mi" {
   count = var.include_search ? 1 : 0
   depends_on = [
@@ -146,6 +146,13 @@ resource "azurerm_role_assignment" "storage_blob_data_contributor_search_mi" {
   principal_id         = azurerm_search_service.search[0].identity[0].principal_id
 }
 
+# ==============================================================================
+# Service Principal Role Assignments
+# ==============================================================================
+# Using Contributor level for blobs to avoid permission issues.
+# For production scenarios, use more restrictive roles as needed.
+# ==============================================================================
+
 # Storage Blob Data Contributor for Service Principal
 resource "azurerm_role_assignment" "storage_blob_data_contributor_sp" {
   depends_on = [
@@ -154,7 +161,7 @@ resource "azurerm_role_assignment" "storage_blob_data_contributor_sp" {
   ]
   scope                = azurerm_storage_account.stg.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Search Index Data Contributor for Service Principal (conditional)
@@ -166,7 +173,7 @@ resource "azurerm_role_assignment" "search_index_data_contributor_sp" {
   ]
   scope                = azurerm_search_service.search[0].id
   role_definition_name = "Search Index Data Contributor"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Search Service Contributor for Service Principal (conditional)
@@ -178,7 +185,7 @@ resource "azurerm_role_assignment" "search_service_contributor_sp" {
   ]
   scope                = azurerm_search_service.search[0].id
   role_definition_name = "Search Service Contributor"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Application Insights Monitoring Contributor for Service Principal
@@ -189,7 +196,7 @@ resource "azurerm_role_assignment" "app_insights_monitoring_contributor_sp" {
   ]
   scope                = azurerm_application_insights.appins.id
   role_definition_name = "Monitoring Contributor"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Role assignment: Azure AI Project Manager
@@ -200,7 +207,7 @@ resource "azurerm_role_assignment" "sp_ai_project_manager" {
   ]
   scope                = azapi_resource.hub.id
   role_definition_name = "Azure AI Project Manager"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Role assignment: Azure AI User
@@ -211,7 +218,7 @@ resource "azurerm_role_assignment" "sp_ai_user" {
   ]
   scope                = azapi_resource.hub.id
   role_definition_name = "Azure AI User"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }
 
 # Role assignment: Cognitive Services Data Contributor (Preview)
@@ -222,5 +229,5 @@ resource "azurerm_role_assignment" "sp_cognitive_services_data_contributor" {
   ]
   scope                = azapi_resource.hub.id
   role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/19c28022-e58e-450d-a464-0b2a53034789"
-  principal_id         = azuread_service_principal.workshop_sp.object_id
+  principal_id         = azuread_service_principal.deployment_sp.object_id
 }

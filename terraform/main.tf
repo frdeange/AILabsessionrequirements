@@ -27,7 +27,7 @@ resource "azurerm_resource_group" "rg" {
 }
 
 ###############################################
-# Service Principal for workshops
+# Service Principal for Azure AI deployments
 ###############################################
 
 # Additional wait time for Service Principal operations
@@ -40,21 +40,21 @@ resource "time_sleep" "wait_for_hub_stability" {
 }
 
 # Create Azure AD Application
-resource "azuread_application" "workshop_app" {
+resource "azuread_application" "deployment_app" {
   display_name = var.service_principal_name
-  description  = "Service Principal for Azure AI workshop exercises"
+  description  = "Service Principal for Azure AI deployments"
 }
 
 # Create Service Principal
-resource "azuread_service_principal" "workshop_sp" {
-  client_id = azuread_application.workshop_app.client_id
+resource "azuread_service_principal" "deployment_sp" {
+  client_id = azuread_application.deployment_app.client_id
   app_role_assignment_required = false
-  description = "Service Principal for Azure AI workshop exercises"
+  description = "Service Principal for Azure AI deployments"
 }
 
 # Create Application Password (Secret)
-resource "azuread_application_password" "workshop_secret" {
-  application_id = azuread_application.workshop_app.id
-  display_name   = "Workshop Secret"
+resource "azuread_application_password" "deployment_secret" {
+  application_id = azuread_application.deployment_app.id
+  display_name   = "Deployment Secret"
   end_date       = "${var.secret_expiration_date}T23:59:59Z"
 }

@@ -90,8 +90,8 @@ AZURE_RESOURCE_LIMITS = {
     "project_name": 30,
 }
 
-# IBM Workshop environment file format constants
-IBM_ENV_SECTIONS = {
+# Environment file format constants
+ENV_SECTIONS = {
     "azure_openai": [
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_OPENAI_API_KEY_PRIMARY", 
@@ -114,9 +114,9 @@ IBM_ENV_SECTIONS = {
     ],
 }
 
-# Fixed values for IBM Workshop compatibility
-IBM_ENV_FIXED_VALUES = {
+# Default fixed values for environment files
+ENV_FIXED_VALUES = {
     "AZURE_OPENAI_API_VERSION": "2024-12-01-preview",
     "AI_FOUNDRY_API_VERSION": "2024-12-01-preview", 
-    "AZURE_SEARCH_INDEX_NAME": "masterclass-index",
+    "AZURE_SEARCH_INDEX_NAME": "ai-search-index",
 }

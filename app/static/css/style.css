@@ -1,7 +1,7 @@
 /* Global layout */
 :root {
-  --brand-ibm:#054ada;
-  --brand-ms:#0078d4;
+  --brand-primary:#0078d4;
+  --brand-secondary:#00a4ef;
   --bg:#0f1115;
   --bg-alt:#1b1f27;
   --panel:#232a35;
@@ -11,7 +11,7 @@
   --danger:#ff4d4f;
   --warn:#ffa940;
   --radius:10px;
-  --gradient:linear-gradient(135deg,var(--brand-ibm),var(--brand-ms));
+  --gradient:linear-gradient(135deg,var(--brand-primary),var(--brand-secondary));
   font-family: 'Segoe UI', system-ui, Arial, sans-serif;
 }
 
@@ -25,7 +25,7 @@
   --accent:#0068b5;
   --danger:#c62828;
   --warn:#c77800;
-  --gradient:linear-gradient(135deg,var(--brand-ibm),var(--brand-ms));
+  --gradient:linear-gradient(135deg,var(--brand-primary),var(--brand-secondary));
 }
 
 /* Transitional theme animation */
@@ -44,8 +44,8 @@ header.site-header { display:flex; align-items:center; justify-content:space-bet
 [data-theme="light"] header.site-header { border-bottom:1px solid #d6dee6; }
 .branding { display:flex; gap:1.2rem; align-items:center; }
 .branding img { height:46px; filter:drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
-.branding .divider { width:2px; height:38px; background:linear-gradient(var(--brand-ibm),var(--brand-ms)); border-radius:2px; }
-.branding h1 { font-size:1.3rem; margin:0; background: linear-gradient(120deg,var(--brand-ibm),var(--brand-ms)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.branding .divider { width:2px; height:38px; background:linear-gradient(var(--brand-primary),var(--brand-secondary)); border-radius:2px; }
+.branding h1 { font-size:1.3rem; margin:0; background: linear-gradient(120deg,var(--brand-primary),var(--brand-secondary)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 
 footer.site-footer { text-align:center; font-size:.8rem; color:var(--text-dim); padding:2rem 1rem 4rem; }
 

@@ -110,7 +110,7 @@ Get everything you need for AI development:
 
 The fastest way to get started! Everything is pre-configured:
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/your-username/your-repo)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/frdeange/AILabsessionrequirements)
 
 1. **Click the badge above** 👆
 2. **Wait for the environment** to initialize (~2 minutes)
@@ -133,7 +133,7 @@ The fastest way to get started! Everything is pre-configured:
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd IBM-SessionRequirements
+cd azure-ai-provisioner
 
 # Create virtual environment
 python -m venv .venv

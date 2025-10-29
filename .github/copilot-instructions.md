@@ -1,7 +1,7 @@
 # AI Assistant Instructions for this Repository
 
 ## Project Overview
-FastAPI web app + Terraform implementing a "Multi-Environment Manager" (Terraform Cloud casero) for Azure AI resources. Creates AI Services, Foundry Hub & Project, model deployment, Storage, Log Analytics + App Insights, optional Azure AI Search. Features persistent deployment state, dashboard management, live log streaming, destroy functionality, and .env file generation for workshop/exercise integration.
+FastAPI web app + Terraform implementing a "Multi-Environment Manager" for Azure AI resources. Creates AI Services, Foundry Hub & Project, model deployment, Storage, Log Analytics + App Insights, optional Azure AI Search. Features persistent deployment state, dashboard management, live log streaming, destroy functionality, and .env file generation for seamless integration with AI projects.
 
 **NEW: Completely refactored with modular service architecture** - Main application reduced from 856 to 221 lines through systematic service extraction and separation of concerns.
 
@@ -35,13 +35,13 @@ app/services/
 app/utils/
 ├── naming.py               - Azure-compliant resource name generation
 ├── file_operations.py      - Terraform file management & cleanup
-└── env_generator.py        - IBM workshop format .env file generation
+└── env_generator.py        - .env file generation for AI projects
 ```
 
 ### **Deployment Lifecycle**
 1. **Create**: Form validation → name generation → terraform orchestration → state persistence
 2. **Manage**: Dashboard view of all deployments with status, actions, resource info
-3. **Results**: View outputs, download IBM workshop-format .env file with all credentials
+3. **Results**: View outputs, download .env file with all credentials
 4. **Destroy**: Terraform destroy orchestration → state cleanup
 
 ## Key Directories / Files
@@ -56,9 +56,9 @@ app/utils/
 - `app/services/deployment_service.py`: High-level workflow orchestration
 - `app/utils/naming.py`: Azure-compliant resource naming with collision avoidance
 - `app/utils/file_operations.py`: Terraform file management for isolated deployments
-- `app/utils/env_generator.py`: IBM workshop format .env file generation
+- `app/utils/env_generator.py`: .env file generation for AI projects
 - `app/templates/deployments.html`: Multi-environment dashboard with destroy/view actions
-- `app/templates/results.html`: Outputs display + .env download button (IBM workshop format)
+- `app/templates/results.html`: Outputs display + .env download button
 - `app/templates/deployment.html`: Live log streaming for create/destroy operations
 
 ### **Infrastructure Layer** 
@@ -92,8 +92,8 @@ POST /destroy/{id} → deployment_service.run_full_destroy()
 # View dashboard
 GET /deployments → persistence_service.get_all_deployments()
 
-# Download .env (IBM workshop format)
-GET /download-env/{id} → env_generator.generate_ibm_env_content()
+# Download .env
+GET /download-env/{id} → env_generator.generate_env_content()
 ```
 
 ### **State Persistence (Centralized Service)**
@@ -145,10 +145,10 @@ async def lifespan(app: FastAPI):
     print("Application shutting down")
 ```
 
-### **.env Generation (IBM Workshop Format)**
-- Matches exact IBM Masterclass format with sections and comments
-- Fixed values: `AZURE_OPENAI_API_VERSION="2024-12-01-preview"`, `AZURE_SEARCH_INDEX_NAME="masterclass-index"`
-- Duplicated keys: `AI_FOUNDRY_*` uses same values as `AZURE_OPENAI_*` for workshop compatibility
+### **.env Generation**
+- Generates .env files with all Azure AI credentials
+- Fixed values: `AZURE_OPENAI_API_VERSION="2024-12-01-preview"`, `AZURE_SEARCH_INDEX_NAME="ai-search-index"`
+- Duplicated keys: `AI_FOUNDRY_*` uses same values as `AZURE_OPENAI_*` for compatibility
 
 ### **UI State Management**
 - Dashboard shows deployment count, status chips with color coding
@@ -214,9 +214,9 @@ from .services.deployment_service import run_deployment   # Orchestration
 - `ensure_azure_login()`: Subscription detection and login verification before terraform
 - Respect subscription resolution order: explicit > env vars > current > single > first listed
 
-### **Workshop/Exercise Integration**
-- `/download-env/{id}` generates IBM workshop-compatible .env files
-- Includes all credentials, fixed API versions, deployment names for seamless exercise integration
+### **Project Integration**
+- `/download-env/{id}` generates .env files with all Azure AI credentials
+- Includes all credentials, fixed API versions, deployment names for seamless integration
 
 ## Security Patterns
 - **No key-based storage auth**: azapi_resource + AAD RBAC only
@@ -232,7 +232,7 @@ cd terraform && terraform validate
 # Check deployment_states/ structure after operations
 
 # Verify .env download
-# curl /download-env/{id} → should match IBM workshop format
+# curl /download-env/{id} → should include all Azure AI credentials
 ```
 
 ## Quick Commands
